@@ -12,31 +12,45 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
+# 项目根目录（manage.py 所在目录）
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
+# ==============================================================================
+# 安全配置
+# ==============================================================================
 
-# SECURITY WARNING: keep the secret key used in production secret!
+# 项目密钥，生产环境务必替换并通过环境变量注入，不可泄露
 SECRET_KEY = 'django-insecure-vlo9zzo#cq8$7pu53iz47m7^*thfyhftuq)jl&-dx!y_-e4c4i'
 
-# SECURITY WARNING: don't run with debug turned on in production!
+# 调试模式：开发环境为 True，生产环境必须改为 False
 DEBUG = True
 
-ALLOWED_HOSTS = []
+# 允许访问的域名/IP，开发环境只允许本地访问
+ALLOWED_HOSTS = ['localhost', '127.0.0.1']
 
 
-# Application definition
+# ==============================================================================
+# 应用注册
+# ==============================================================================
 
 INSTALLED_APPS = [
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.messages',
-    'django.contrib.staticfiles',
+    # Django 内置应用
+    'django.contrib.admin',           # 后台管理
+    'django.contrib.auth',            # 用户认证
+    'django.contrib.contenttypes',    # 内容类型框架
+    'django.contrib.sessions',        # 会话管理
+    'django.contrib.messages',        # 消息框架
+    'django.contrib.staticfiles',     # 静态文件管理
+
+    # 第三方应用
+    'rest_framework',                 # Django REST Framework，提供接口序列化与字段限制
+
+    # 业务模块（每个子模块作为独立 Django app 注册）
+    'app.category',                   # 品类模块
+    'app.category_attr_def',          # 品类属性定义模块
+    'app.product',                    # 商品模块
+    'app.product_attr_value',         # 商品属性值模块
 ]
 
 MIDDLEWARE = [
@@ -51,11 +65,17 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'weige.urls'
 
+
+# ==============================================================================
+# 模板配置
+# ==============================================================================
+
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'templates']
-        ,
+        # 全局模板目录（优先于 app 内部的 templates）
+        'DIRS': [BASE_DIR / 'templates'],
+        # 自动搜索各 app 内部的 templates 目录
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -70,19 +90,29 @@ TEMPLATES = [
 WSGI_APPLICATION = 'weige.wsgi.application'
 
 
-# Database
-# https://docs.djangoproject.com/en/5.2/ref/settings/#databases
+# ==============================================================================
+# 数据库配置（MySQL）
+# 依赖：pip install mysqlclient
+# ==============================================================================
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.mysql',    # 使用 MySQL 数据库
+        'NAME': 'wgdb',                          # 数据库名称
+        'USER': 'root',                          # 数据库用户名
+        'PASSWORD': '123123zhh',                 # 数据库密码
+        'HOST': '127.0.0.1',                     # 数据库地址
+        'PORT': '3306',                          # 数据库端口
+        'OPTIONS': {
+            'charset': 'utf8mb4',                # 支持中文及 emoji
+        },
     }
 }
 
 
-# Password validation
-# https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
+# ==============================================================================
+# 密码验证
+# ==============================================================================
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -100,24 +130,47 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 
-# Internationalization
-# https://docs.djangoproject.com/en/5.2/topics/i18n/
+# ==============================================================================
+# 国际化配置
+# ==============================================================================
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'zh-hans'      # 简体中文（Admin 后台也会显示中文）
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Asia/Shanghai'    # 北京时间
 
-USE_I18N = True
+USE_I18N = True                # 开启国际化
 
-USE_TZ = True
+USE_TZ = True                  # 开启时区支持
 
 
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.2/howto/static-files/
+# ==============================================================================
+# 静态文件配置（CSS / JS / 图标等）
+# ==============================================================================
 
-STATIC_URL = 'static/'
+# 静态文件访问路径前缀
+STATIC_URL = '/static/'
 
-# Default primary key field type
-# https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
+# 开发环境静态文件存放目录（暂未使用，需要时取消注释并创建 static 目录）
+# STATICFILES_DIRS = [BASE_DIR / 'static']
 
+# 生产环境执行 collectstatic 后的输出目录
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+
+# ==============================================================================
+# 媒体文件配置（用户上传的商品图片等）
+# ==============================================================================
+
+# 媒体文件访问路径前缀
+MEDIA_URL = '/media/'
+
+# 媒体文件存储目录
+MEDIA_ROOT = BASE_DIR / 'media'
+
+
+# ==============================================================================
+# 其他配置
+# ==============================================================================
+
+# 默认主键字段类型
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

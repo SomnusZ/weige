@@ -1,22 +1,19 @@
-"""
-URL configuration for weige project.
-
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/5.2/topics/http/urls/
-Examples:
-Function views
-    1. Add an import:  from my_app import views
-    2. Add a URL to urlpatterns:  path('', views.home, name='home')
-Class-based views
-    1. Add an import:  from other_app.views import Home
-    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
-Including another URLconf
-    1. Import the include() function: from django.urls import include, path
-    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
-"""
 from django.contrib import admin
-from django.urls import path
+from django.urls import path, include
+from django.conf import settings
+from django.conf.urls.static import static
 
 urlpatterns = [
+    # Django 后台管理
     path('admin/', admin.site.urls),
+
+    # 业务模块接口，统一加 /api/ 前缀
+    path('api/', include('app.category.urls')),             # 品类模块
+    path('api/', include('app.category_attr_def.urls')),    # 品类属性定义模块
+    path('api/', include('app.product.urls')),              # 商品模块
+    path('api/', include('app.product_attr_value.urls')),   # 商品属性值模块
 ]
+
+# 开发环境下提供媒体文件访问（生产环境由 Nginx 处理）
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
