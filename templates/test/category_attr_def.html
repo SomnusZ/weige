@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CategoryAttrDef API · 测试台</title>
+<style>
+:root {
+  --bg: #0f1117; --bg2: #1a1d27; --bg3: #22263a;
+  --border: #2e3250; --accent: #6c63ff; --accent2: #818cf8;
+  --green: #34d399; --orange: #fb923c; --red: #f87171; --blue: #60a5fa;
+  --yellow: #fbbf24; --purple: #c084fc;
+  --text: #e2e8f0; --text2: #94a3b8; --text3: #64748b;
+  --radius: 12px; --radius-sm: 8px; --shadow: 0 4px 24px rgba(0,0,0,0.4);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif; background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+
+/* 顶部 */
+.topbar { display:flex; align-items:center; padding:0 24px; height:56px; background:var(--bg2); border-bottom:1px solid var(--border); flex-shrink:0; gap:16px; }
+.logo { display:flex; align-items:center; gap:10px; font-size:16px; font-weight:700; color:var(--accent2); }
+.logo-icon { width:28px; height:28px; background:linear-gradient(135deg,var(--accent),var(--accent2)); border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:14px; }
+.badge { font-size:11px; padding:2px 8px; border-radius:20px; background:rgba(108,99,255,0.2); color:var(--accent2); border:1px solid rgba(108,99,255,0.3); }
+.topbar-right { margin-left:auto; display:flex; align-items:center; gap:12px; font-size:12px; color:var(--text3); }
+.dot { width:7px; height:7px; border-radius:50%; background:var(--green); box-shadow:0 0 6px var(--green); }
+
+/* 主体 */
+.main { display:flex; flex:1; overflow:hidden; }
+
+/* 侧边栏 */
+.sidebar { width:220px; flex-shrink:0; background:var(--bg2); border-right:1px solid var(--border); display:flex; flex-direction:column; padding:16px 0; overflow-y:auto; }
+.sidebar-title { font-size:11px; font-weight:600; color:var(--text3); letter-spacing:1.5px; text-transform:uppercase; padding:0 16px 12px; }
+.nav-item { display:flex; align-items:center; gap:10px; padding:10px 16px; cursor:pointer; color:var(--text2); font-size:13px; position:relative; transition:all 0.2s; }
+.nav-item:hover { background:rgba(108,99,255,0.08); color:var(--text); }
+.nav-item.active { background:rgba(108,99,255,0.15); color:var(--accent2); }
+.nav-item.active::before { content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--accent); border-radius:0 2px 2px 0; }
+.method-tag { font-size:10px; font-weight:700; padding:2px 6px; border-radius:4px; letter-spacing:0.5px; flex-shrink:0; }
+.get   { background:rgba(96,165,250,0.15);  color:var(--blue); }
+.post  { background:rgba(52,211,153,0.15);  color:var(--green); }
+.patch { background:rgba(251,146,60,0.15);  color:var(--orange); }
+.del   { background:rgba(248,113,113,0.15); color:var(--red); }
+.divider { height:1px; background:var(--border); margin:4px 16px; }
+
+/* 表单区 */
+.form-area { flex:1; min-width:320px; max-width:500px; border-right:1px solid var(--border); display:flex; flex-direction:column; overflow:hidden; }
+.form-header { padding:20px 24px 16px; border-bottom:1px solid var(--border); flex-shrink:0; }
+.form-title { font-size:16px; font-weight:600; color:var(--text); margin-bottom:4px; }
+.form-endpoint { font-size:12px; color:var(--text3); font-family:'Cascadia Code','Fira Code',monospace; display:flex; align-items:center; gap:8px; }
+.form-body { flex:1; padding:24px; overflow-y:auto; display:flex; flex-direction:column; gap:16px; }
+.form-panel { display:none; flex-direction:column; gap:16px; }
+.form-panel.active { display:flex; }
+
+/* 表单控件 */
+.field { display:flex; flex-direction:column; gap:6px; }
+.field label { font-size:12px; font-weight:500; color:var(--text2); display:flex; align-items:center; gap:6px; }
+.required { color:var(--red); font-size:14px; }
+.field input, .field select {
+  background:var(--bg3); border:1px solid var(--border); border-radius:var(--radius-sm);
+  color:var(--text); font-size:13px; padding:10px 14px; outline:none;
+  transition:border-color 0.2s,box-shadow 0.2s; font-family:inherit; width:100%;
+}
+.field select option { background:var(--bg3); }
+.field input:focus, .field select:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(108,99,255,0.15); }
+.field input::placeholder { color:var(--text3); }
+.field-hint { font-size:11px; color:var(--text3); }
+
+/* 开关 */
+.toggle-row { display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:var(--bg3); border:1px solid var(--border); border-radius:var(--radius-sm); }
+.toggle-label { font-size:13px; color:var(--text2); }
+.toggle-wrap { display:flex; align-items:center; gap:10px; }
+.toggle-status { font-size:12px; color:var(--text3); min-width:30px; text-align:right; transition:color 0.2s; }
+.toggle { position:relative; width:36px; height:20px; cursor:pointer; flex-shrink:0; }
+.toggle input { opacity:0; width:0; height:0; position:absolute; }
+.toggle-track { position:absolute; inset:0; background:var(--border); border-radius:20px; transition:background 0.2s; }
+.toggle input:checked + .toggle-track { background:var(--green); }
+.toggle-thumb { position:absolute; width:14px; height:14px; background:#fff; border-radius:50%; top:3px; left:3px; transition:transform 0.2s; box-shadow:0 1px 4px rgba(0,0,0,0.3); }
+.toggle input:checked ~ .toggle-thumb { transform:translateX(16px); }
+
+.btn-submit { margin-top:4px; padding:11px; border:none; border-radius:var(--radius-sm); font-size:13px; font-weight:600; cursor:pointer; transition:all 0.2s; display:flex; align-items:center; justify-content:center; gap:8px; }
+.btn-submit:hover { transform:translateY(-1px); filter:brightness(1.1); }
+.btn-submit:active { transform:translateY(0); }
+.btn-submit:disabled { opacity:0.6; cursor:not-allowed; transform:none; }
+.btn-get    { background:linear-gradient(135deg,#3b82f6,#1d4ed8); color:#fff; }
+.btn-post   { background:linear-gradient(135deg,#10b981,#059669); color:#fff; }
+.btn-patch  { background:linear-gradient(135deg,#f97316,#ea580c); color:#fff; }
+.btn-delete { background:linear-gradient(135deg,#ef4444,#dc2626); color:#fff; }
+
+.spinner { width:14px; height:14px; border:2px solid rgba(255,255,255,0.3); border-top-color:#fff; border-radius:50%; animation:spin 0.6s linear infinite; display:none; }
+@keyframes spin { to { transform:rotate(360deg); } }
+
+/* 响应区 */
+.response-area { flex:1; min-width:0; display:flex; flex-direction:column; overflow:hidden; }
+.response-header { padding:12px 20px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:10px; flex-shrink:0; background:var(--bg2); }
+.response-header-title { font-size:13px; font-weight:600; color:var(--text2); white-space:nowrap; }
+.view-tabs { display:flex; gap:4px; }
+.view-tab { padding:4px 12px; border-radius:6px; font-size:12px; cursor:pointer; color:var(--text3); transition:all 0.2s; border:1px solid transparent; }
+.view-tab.active { background:rgba(108,99,255,0.15); color:var(--accent2); border-color:rgba(108,99,255,0.3); }
+.meta-pills { display:flex; gap:6px; margin-left:auto; }
+.pill { font-size:11px; padding:3px 10px; border-radius:20px; background:var(--bg3); border:1px solid var(--border); color:var(--text2); }
+.pill-ok  { border-color:rgba(52,211,153,0.4);  color:var(--green); background:rgba(52,211,153,0.08); }
+.pill-err { border-color:rgba(248,113,113,0.4); color:var(--red);   background:rgba(248,113,113,0.08); }
+.copy-btn { padding:4px 12px; background:var(--bg3); border:1px solid var(--border); border-radius:var(--radius-sm); color:var(--text2); font-size:11px; cursor:pointer; transition:all 0.2s; white-space:nowrap; }
+.copy-btn:hover { border-color:var(--accent); color:var(--accent2); }
+
+.response-body { flex:1; overflow:hidden; position:relative; }
+
+/* JSON 视图 */
+#view-json { height:100%; display:none; }
+pre#output { height:100%; overflow-y:auto; padding:20px; font-family:'Cascadia Code','Fira Code','Consolas',monospace; font-size:12.5px; line-height:1.7; background:var(--bg); white-space:pre-wrap; word-break:break-all; }
+.j-key  { color:#818cf8; } .j-str { color:#34d399; } .j-num { color:#fb923c; } .j-bool { color:#60a5fa; } .j-null { color:#94a3b8; }
+
+/* 列表视图 */
+#view-list { height:100%; display:none; overflow-y:auto; padding:16px 20px; }
+.attr-list-header { font-size:11px; color:var(--text3); font-weight:600; letter-spacing:1px; text-transform:uppercase; padding-bottom:10px; border-bottom:1px solid var(--border); margin-bottom:12px; display:flex; align-items:center; gap:8px; }
+.attr-card { background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius-sm); padding:12px 16px; margin-bottom:8px; display:flex; align-items:center; gap:12px; transition:border-color 0.2s; }
+.attr-card:hover { border-color:rgba(108,99,255,0.4); }
+.attr-id { font-size:11px; color:var(--text3); min-width:32px; }
+.attr-name { font-size:13px; font-weight:500; color:var(--text); flex:1; }
+.type-badge { font-size:11px; font-weight:600; padding:2px 8px; border-radius:4px; letter-spacing:0.5px; }
+.type-str   { background:rgba(96,165,250,0.15);  color:var(--blue); }
+.type-int   { background:rgba(251,146,60,0.15);  color:var(--orange); }
+.type-float { background:rgba(192,132,252,0.15); color:var(--purple); }
+.type-bool  { background:rgba(52,211,153,0.15);  color:var(--green); }
+.req-badge { font-size:11px; padding:2px 8px; border-radius:4px; }
+.req-yes { background:rgba(248,113,113,0.12); color:var(--red); border:1px solid rgba(248,113,113,0.25); }
+.req-no  { background:var(--bg3); color:var(--text3); border:1px solid var(--border); }
+.attr-time { font-size:11px; color:var(--text3); margin-left:auto; white-space:nowrap; }
+
+/* 空状态 */
+.empty-state { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; color:var(--text3); gap:12px; pointer-events:none; }
+.empty-icon { font-size:48px; opacity:0.3; }
+.empty-text { font-size:13px; }
+
+/* Toast */
+.toast { position:fixed; bottom:24px; right:24px; padding:10px 18px; border-radius:var(--radius-sm); font-size:13px; color:#fff; box-shadow:var(--shadow); transform:translateY(20px); opacity:0; transition:all 0.3s; z-index:999; pointer-events:none; }
+.toast.show { transform:translateY(0); opacity:1; }
+.toast.success { background:#059669; } .toast.error { background:#dc2626; } .toast.info { background:#2563eb; }
+
+::-webkit-scrollbar { width:4px; } ::-webkit-scrollbar-track { background:transparent; } ::-webkit-scrollbar-thumb { background:var(--border); border-radius:4px; }
+
+.warn-box { font-size:12px; color:var(--text3); line-height:1.6; padding:10px 12px; background:rgba(248,113,113,0.06); border:1px solid rgba(248,113,113,0.2); border-radius:8px; }
+.info-box { font-size:12px; color:var(--text3); line-height:1.6; padding:10px 12px; background:rgba(96,165,250,0.06); border:1px solid rgba(96,165,250,0.2); border-radius:8px; }
+.section-label { font-size:11px; font-weight:600; color:var(--text3); text-transform:uppercase; letter-spacing:1px; padding-bottom:4px; border-bottom:1px solid var(--border); }
+.loading-inline { display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--text3); }
+.spinner-sm { width:10px; height:10px; border:2px solid rgba(130,140,248,0.3); border-top-color:var(--accent2); border-radius:50%; animation:spin 0.6s linear infinite; }
+select:disabled { opacity:0.5; cursor:not-allowed; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo"><div class="logo-icon">🏷</div>AttrDef API</div>
+  <span class="badge">TEST</span>
+  <div class="topbar-right"><div class="dot"></div><span>本地服务运行中 · 127.0.0.1:8000</span></div>
+</div>
+
+<div class="main">
+
+  <!-- 侧边栏 -->
+  <div class="sidebar">
+    <div class="sidebar-title">接口列表</div>
+    <div class="nav-item active" onclick="switchPanel('dir')"><span class="method-tag get">GET</span><span>查询属性定义</span></div>
+    <div class="nav-item" onclick="switchPanel('create')"><span class="method-tag post">POST</span><span>新增属性定义</span></div>
+    <div class="nav-item" onclick="switchPanel('update')"><span class="method-tag patch">PATCH</span><span>修改属性定义</span></div>
+    <div class="nav-item" onclick="switchPanel('delete')"><span class="method-tag del">DELETE</span><span>删除属性定义</span></div>
+    <div class="divider" style="margin-top:16px;"></div>
+    <div class="sidebar-title" style="margin-top:16px;">快捷操作</div>
+    <div class="nav-item" onclick="refreshCategoryDropdowns()" style="font-size:12px;"><span>🔄</span><span>刷新品类列表</span></div>
+    <div class="nav-item" onclick="clearOutput()" style="font-size:12px;"><span>🗑</span><span>清空响应区</span></div>
+  </div>
+
+  <!-- 表单区 -->
+  <div class="form-area">
+
+    <!-- 查询 header -->
+    <div id="header-dir" class="form-header">
+      <div class="form-title">查询品类属性定义</div>
+      <div class="form-endpoint"><span class="method-tag get">GET</span>/api/attr-defs/dir/?category_id=&lt;id&gt;</div>
+    </div>
+    <!-- 新增 header -->
+    <div id="header-create" class="form-header" style="display:none">
+      <div class="form-title">新增属性定义</div>
+      <div class="form-endpoint"><span class="method-tag post">POST</span>/api/attr-defs/create/</div>
+    </div>
+    <!-- 修改 header -->
+    <div id="header-update" class="form-header" style="display:none">
+      <div class="form-title">修改属性定义</div>
+      <div class="form-endpoint"><span class="method-tag patch">PATCH</span>/api/attr-defs/&lt;id&gt;/update/</div>
+    </div>
+    <!-- 删除 header -->
+    <div id="header-delete" class="form-header" style="display:none">
+      <div class="form-title">删除属性定义</div>
+      <div class="form-endpoint"><span class="method-tag del">DELETE</span>/api/attr-defs/&lt;id&gt;/delete/</div>
+    </div>
+
+    <div class="form-body">
+
+      <!-- ── 查询面板 ── -->
+      <div id="panel-dir" class="form-panel active">
+        <div class="field">
+          <label>所属品类 <span class="required">*</span></label>
+          <select id="dir-category">
+            <option value="">-- 请选择品类 --</option>
+          </select>
+          <span class="field-hint">查询该品类下所有属性定义（含非末级品类）</span>
+        </div>
+        <button class="btn-submit btn-get" id="btn-dir" onclick="dirAttrDef()">
+          <span class="spinner" id="sp-dir"></span>发起查询
+        </button>
+      </div>
+
+      <!-- ── 新增面板 ── -->
+      <div id="panel-create" class="form-panel">
+        <div class="field">
+          <label>所属品类 <span class="required">*</span></label>
+          <select id="c-category">
+            <option value="">-- 请选择品类 --</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>属性名称 <span class="required">*</span></label>
+          <input id="c-attr-name" type="text" placeholder="例：颜色、袖长、材质">
+        </div>
+        <div class="field">
+          <label>属性值类型 <span class="required">*</span></label>
+          <select id="c-value-type">
+            <option value="str">str · 文本</option>
+            <option value="int">int · 整数</option>
+            <option value="float">float · 小数</option>
+            <option value="bool">bool · 布尔值</option>
+          </select>
+          <span class="field-hint">创建后不可修改，请谨慎选择</span>
+        </div>
+        <div class="field">
+          <label>是否必填</label>
+          <div class="toggle-row">
+            <span class="toggle-label">该属性是否为商品必填项</span>
+            <div class="toggle-wrap">
+              <span class="toggle-status" id="c-req-status">否</span>
+              <label class="toggle">
+                <input type="checkbox" id="c-is-required" onchange="updateToggleStatus('c-is-required','c-req-status')">
+                <div class="toggle-track"></div>
+                <div class="toggle-thumb"></div>
+              </label>
+            </div>
+          </div>
+        </div>
+        <button class="btn-submit btn-post" id="btn-create" onclick="createAttrDef()">
+          <span class="spinner" id="sp-create"></span>创建属性定义
+        </button>
+      </div>
+
+      <!-- ── 修改面板 ── -->
+      <div id="panel-update" class="form-panel">
+        <div class="section-label">第一步：定位属性定义</div>
+        <div class="field">
+          <label>所属品类</label>
+          <select id="u-category" onchange="loadAttrDefsFor('u-category','u-attr-def','-- 请选择属性 --')">
+            <option value="">-- 请选择品类 --</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>选择属性定义 <span class="required">*</span></label>
+          <select id="u-attr-def" disabled>
+            <option value="">-- 请先选择品类 --</option>
+          </select>
+          <span id="u-attr-def-hint" class="field-hint"></span>
+        </div>
+        <div class="section-label" style="margin-top:4px;">第二步：填写修改内容</div>
+        <div class="info-box">ℹ️ 仅可修改属性名称与是否必填；属性值类型与所属品类创建后不可变更。</div>
+        <div class="field">
+          <label>新属性名称</label>
+          <input id="u-attr-name" type="text" placeholder="留空则不修改">
+        </div>
+        <div class="field">
+          <label>是否必填</label>
+          <div class="toggle-row">
+            <span class="toggle-label">该属性是否为商品必填项</span>
+            <div class="toggle-wrap">
+              <span class="toggle-status" id="u-req-status">否</span>
+              <label class="toggle">
+                <input type="checkbox" id="u-is-required" onchange="updateToggleStatus('u-is-required','u-req-status')">
+                <div class="toggle-track"></div>
+                <div class="toggle-thumb"></div>
+              </label>
+            </div>
+          </div>
+          <span class="field-hint">※ 此项始终会被提交，请确认当前状态</span>
+        </div>
+        <button class="btn-submit btn-patch" id="btn-update" onclick="updateAttrDef()">
+          <span class="spinner" id="sp-update"></span>提交修改
+        </button>
+      </div>
+
+      <!-- ── 删除面板 ── -->
+      <div id="panel-delete" class="form-panel">
+        <div class="field">
+          <label>所属品类</label>
+          <select id="d-category" onchange="loadAttrDefsFor('d-category','d-attr-def','-- 请选择属性 --')">
+            <option value="">-- 请选择品类 --</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>选择要删除的属性定义 <span class="required">*</span></label>
+          <select id="d-attr-def" disabled>
+            <option value="">-- 请先选择品类 --</option>
+          </select>
+          <span id="d-attr-def-hint" class="field-hint"></span>
+        </div>
+        <p class="warn-box">⚠️ 逻辑删除，数据不会真正移除。删除后该属性定义从列表中隐藏，但已录入的商品属性值数据仍保留。</p>
+        <button class="btn-submit btn-delete" id="btn-delete" onclick="deleteAttrDef()">
+          <span class="spinner" id="sp-delete"></span>确认删除
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 响应区 -->
+  <div class="response-area">
+    <div class="response-header">
+      <span class="response-header-title">响应结果</span>
+      <div class="view-tabs">
+        <div class="view-tab active" id="tab-list" onclick="switchView('list')">☰ 列表</div>
+        <div class="view-tab" id="tab-json" onclick="switchView('json')">{ } JSON</div>
+      </div>
+      <div class="meta-pills">
+        <div class="pill" id="pill-method" style="display:none"></div>
+        <div class="pill" id="pill-status" style="display:none"></div>
+        <div class="pill" id="pill-time"   style="display:none"></div>
+      </div>
+      <button class="copy-btn" onclick="copyOutput()">复制</button>
+    </div>
+    <div class="response-body">
+      <div class="empty-state" id="empty-state">
+        <div class="empty-icon">🏷</div>
+        <div class="empty-text">选择品类后发起查询，属性定义将显示在这里</div>
+      </div>
+      <div id="view-list"></div>
+      <div id="view-json"><pre id="output"></pre></div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const BASE = '/api';
+let allCategories = [];
+let lastOutput = '';
+let currentView = 'list';
+// 缓存已加载的品类属性 { categoryId: [attrDef, ...] }
+const attrDefCache = {};
+
+// ── 面板切换 ──
+function switchPanel(name) {
+  ['dir','create','update','delete'].forEach(n => {
+    document.getElementById(`panel-${n}`).classList.toggle('active', n === name);
+    document.getElementById(`header-${n}`).style.display = n === name ? '' : 'none';
+  });
+  document.querySelectorAll('.nav-item').forEach((el, i) => {
+    el.classList.toggle('active', i === ['dir','create','update','delete'].indexOf(name));
+  });
+}
+
+// ── 视图切换 ──
+function switchView(view) {
+  currentView = view;
+  document.getElementById('tab-list').classList.toggle('active', view === 'list');
+  document.getElementById('tab-json').classList.toggle('active', view === 'json');
+  document.getElementById('view-list').style.display = view === 'list' ? 'block' : 'none';
+  document.getElementById('view-json').style.display = view === 'json' ? 'block' : 'none';
+}
+
+// ── 开关状态文字 ──
+function updateToggleStatus(checkId, statusId) {
+  const checked = document.getElementById(checkId).checked;
+  const el = document.getElementById(statusId);
+  el.textContent = checked ? '是' : '否';
+  el.style.color = checked ? 'var(--green)' : 'var(--text3)';
+}
+
+// ── 计算叶子节点品类 ──
+function getLeafCategories() {
+  const parentIds = new Set(allCategories.map(c => c.parent_id).filter(id => id != null));
+  return allCategories.filter(c => !parentIds.has(c.id));
+}
+
+// ── 填充品类下拉 ──
+// c-category（新增）：只显示叶子节点，属性定义只能配置在末级品类
+// dir/u/d-category（查询/修改/删除）：显示全部品类
+function populateCategorySelects() {
+  const leaves = getLeafCategories();
+
+  const configs = {
+    'dir-category': { list: allCategories, placeholder: '-- 请选择品类 --' },
+    'c-category':   { list: leaves,        placeholder: '-- 请选择末级品类 --' },
+    'u-category':   { list: leaves,        placeholder: '-- 请选择末级品类 --' },
+    'd-category':   { list: leaves,        placeholder: '-- 请选择末级品类 --' },
+  };
+
+  Object.entries(configs).forEach(([id, cfg]) => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    const cur = sel.value;
+    sel.innerHTML = `<option value="">${cfg.placeholder}</option>`;
+    cfg.list.forEach(c => {
+      const label = c.parent_name ? `${c.parent_name} / ${c.category_name}` : c.category_name;
+      sel.innerHTML += `<option value="${c.id}">${label}（ID: ${c.id}）</option>`;
+    });
+    if (cur) sel.value = cur;
+  });
+}
+
+// ── 加载指定品类的属性定义，填入目标 select ──
+async function loadAttrDefsFor(categorySelectId, attrDefSelectId, placeholder) {
+  const catId = document.getElementById(categorySelectId).value;
+  const attrSel = document.getElementById(attrDefSelectId);
+  const hintId = attrDefSelectId + '-hint';
+  const hint = document.getElementById(hintId);
+
+  attrSel.innerHTML = `<option value="">-- 加载中... --</option>`;
+  attrSel.disabled = true;
+  if (hint) hint.innerHTML = '<span class="loading-inline"><span class="spinner-sm"></span>正在加载…</span>';
+
+  if (!catId) {
+    attrSel.innerHTML = `<option value="">${placeholder.replace('请选择属性','请先选择品类')}</option>`;
+    if (hint) hint.textContent = '';
+    return;
+  }
+
+  // 使用缓存
+  if (attrDefCache[catId]) {
+    fillAttrDefSelect(attrSel, attrDefCache[catId], placeholder, hint);
+    return;
+  }
+
+  try {
+    const res = await fetch(`${BASE}/attr-defs/dir/?category_id=${catId}`);
+    const data = await res.json();
+    if (data.success && data.data) {
+      attrDefCache[catId] = data.data;
+      fillAttrDefSelect(attrSel, data.data, placeholder, hint);
+    } else {
+      attrSel.innerHTML = `<option value="">-- 加载失败 --</option>`;
+      if (hint) hint.textContent = '加载失败，请重试';
+    }
+  } catch(e) {
+    attrSel.innerHTML = `<option value="">-- 网络错误 --</option>`;
+    if (hint) hint.textContent = '网络错误';
+  }
+}
+
+function fillAttrDefSelect(sel, list, placeholder, hint) {
+  sel.innerHTML = `<option value="">${placeholder}</option>`;
+  if (list.length === 0) {
+    sel.innerHTML += `<option value="" disabled>该品类暂无属性定义</option>`;
+    if (hint) hint.textContent = '该品类下暂无属性定义';
+  } else {
+    list.forEach(a => {
+      const typeLabel = { str:'文本', int:'整数', float:'小数', bool:'布尔' }[a.value_type] || a.value_type;
+      const reqLabel = a.is_required ? '必填' : '选填';
+      sel.innerHTML += `<option value="${a.id}">${a.attr_name}（${typeLabel} · ${reqLabel}）ID: ${a.id}</option>`;
+    });
+    if (hint) hint.textContent = `共 ${list.length} 条属性定义`;
+  }
+  sel.disabled = false;
+}
+
+// ── 拉取品类列表 ──
+async function refreshCategoryDropdowns() {
+  try {
+    const res = await fetch(`${BASE}/categories/dir/`);
+    const data = await res.json();
+    if (data.success && data.data) {
+      allCategories = data.data;
+      populateCategorySelects();
+      toast(`已加载 ${allCategories.length} 个品类`, 'info');
+    }
+  } catch(e) {
+    toast('品类列表加载失败：' + e.message, 'error');
+  }
+}
+
+// ── JSON 语法高亮 ──
+function highlight(json) {
+  return json.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, m => {
+      if (/^"/.test(m)) return /:$/.test(m) ? `<span class="j-key">${m}</span>` : `<span class="j-str">${m}</span>`;
+      if (/true|false/.test(m)) return `<span class="j-bool">${m}</span>`;
+      if (/null/.test(m))       return `<span class="j-null">${m}</span>`;
+      return `<span class="j-num">${m}</span>`;
+    });
+}
+
+// ── 渲染列表视图 ──
+function renderListView(attrDefs, catId) {
+  const listEl = document.getElementById('view-list');
+  if (!attrDefs || attrDefs.length === 0) {
+    const catName = allCategories.find(c => c.id == catId)?.category_name || `ID ${catId}`;
+    listEl.innerHTML = `
+      <div class="attr-list-header">「${catName}」的属性定义 <span style="color:var(--text3);font-weight:400">共 0 条</span></div>
+      <div style="padding:32px 0;text-align:center;color:var(--text3);font-size:13px;">该品类暂无属性定义</div>`;
+    return;
+  }
+  const catName = allCategories.find(c => c.id == catId)?.category_name || `ID ${catId}`;
+  const typeMap = { str:'str · 文本', int:'int · 整数', float:'float · 小数', bool:'bool · 布尔' };
+  const typeClass = { str:'type-str', int:'type-int', float:'type-float', bool:'type-bool' };
+  let html = `<div class="attr-list-header">「${catName}」的属性定义 <span style="color:var(--text3);font-weight:400">共 ${attrDefs.length} 条</span></div>`;
+  attrDefs.forEach(a => {
+    const date = a.create_time ? a.create_time.replace('T',' ').substring(0,16) : '';
+    html += `
+      <div class="attr-card">
+        <span class="attr-id">#${a.id}</span>
+        <span class="attr-name">${a.attr_name}</span>
+        <span class="type-badge ${typeClass[a.value_type]||''}">${typeMap[a.value_type]||a.value_type}</span>
+        <span class="req-badge ${a.is_required ? 'req-yes' : 'req-no'}">${a.is_required ? '必填' : '选填'}</span>
+        <span class="attr-time">${date}</span>
+      </div>`;
+  });
+  listEl.innerHTML = html;
+}
+
+// ── 显示响应 ──
+function showResponse(method, status, ms, data, isDir = false, catId = null) {
+  document.getElementById('empty-state').style.display = 'none';
+  lastOutput = JSON.stringify(data, null, 2);
+  document.getElementById('output').innerHTML = highlight(lastOutput);
+
+  const methodColors = { GET:'get', POST:'post', PATCH:'patch', DELETE:'del' };
+  const pm = document.getElementById('pill-method');
+  pm.style.display = '';
+  pm.innerHTML = `<span class="method-tag ${methodColors[method]||''}">${method}</span>`;
+  const ps = document.getElementById('pill-status');
+  ps.style.display = '';
+  const ok = status >= 200 && status < 300;
+  ps.className = `pill ${ok ? 'pill-ok' : 'pill-err'}`;
+  ps.textContent = `${status} ${ok ? 'OK' : 'ERR'}`;
+  const pt = document.getElementById('pill-time');
+  pt.style.display = '';
+  pt.textContent = `${ms}ms`;
+
+  if (isDir && data.success && Array.isArray(data.data)) {
+    renderListView(data.data, catId);
+    switchView('list');
+  } else {
+    switchView('json');
+  }
+}
+
+// ── 通用请求 ──
+async function request(method, url, body, btnId, spId, isDir = false, catId = null) {
+  const btn = document.getElementById(btnId);
+  const sp  = document.getElementById(spId);
+  btn.disabled = true; sp.style.display = 'inline-block';
+  const t0 = Date.now();
+  try {
+    const opts = { method, headers: { 'Content-Type': 'application/json' } };
+    if (body) opts.body = JSON.stringify(body);
+    const res  = await fetch(url, opts);
+    const data = await res.json();
+    const ms   = Date.now() - t0;
+    showResponse(method, res.status, ms, data, isDir, catId);
+    toast(data.message || (res.ok ? '请求成功' : '请求失败'), res.ok ? 'success' : 'error');
+    if (res.ok && !isDir) {
+      // 增删改后清除受影响品类的缓存，并重新加载品类列表
+      if (catId) delete attrDefCache[catId];
+    }
+  } catch(e) {
+    showResponse(method, 0, Date.now()-t0, { error: e.message });
+    toast('网络错误：' + e.message, 'error');
+  } finally {
+    btn.disabled = false; sp.style.display = 'none';
+  }
+}
+
+// ── 各接口 ──
+function dirAttrDef() {
+  const catId = document.getElementById('dir-category').value;
+  if (!catId) { toast('请先选择品类', 'error'); return; }
+  // 清除该品类缓存以确保拿到最新数据
+  delete attrDefCache[catId];
+  request('GET', `${BASE}/attr-defs/dir/?category_id=${catId}`, null, 'btn-dir', 'sp-dir', true, catId);
+}
+
+function createAttrDef() {
+  const catId   = document.getElementById('c-category').value;
+  const name    = document.getElementById('c-attr-name').value.trim();
+  const vtype   = document.getElementById('c-value-type').value;
+  const isReq   = document.getElementById('c-is-required').checked;
+
+  if (!catId)  { toast('请选择所属品类', 'error'); return; }
+  if (!name)   { toast('请填写属性名称', 'error'); return; }
+
+  const body = { category: parseInt(catId), attr_name: name, value_type: vtype, is_required: isReq };
+  request('POST', `${BASE}/attr-defs/create/`, body, 'btn-create', 'sp-create', false, parseInt(catId));
+}
+
+function updateAttrDef() {
+  const attrId  = document.getElementById('u-attr-def').value;
+  const catId   = document.getElementById('u-category').value;
+  const name    = document.getElementById('u-attr-name').value.trim();
+  const isReq   = document.getElementById('u-is-required').checked;
+
+  if (!attrId) { toast('请选择要修改的属性定义', 'error'); return; }
+
+  const body = { is_required: isReq };
+  if (name) body.attr_name = name;
+
+  request('PATCH', `${BASE}/attr-defs/${attrId}/update/`, body, 'btn-update', 'sp-update', false, catId ? parseInt(catId) : null);
+}
+
+function deleteAttrDef() {
+  const attrId = document.getElementById('d-attr-def').value;
+  const catId  = document.getElementById('d-category').value;
+  const sel    = document.getElementById('d-attr-def');
+  const name   = sel.options[sel.selectedIndex]?.text || '';
+
+  if (!attrId) { toast('请选择要删除的属性定义', 'error'); return; }
+  if (!confirm(`确认删除属性「${name}」？`)) return;
+
+  request('DELETE', `${BASE}/attr-defs/${attrId}/delete/`, null, 'btn-delete', 'sp-delete', false, catId ? parseInt(catId) : null);
+}
+
+// ── 工具 ──
+function clearOutput() {
+  document.getElementById('output').innerHTML = '';
+  document.getElementById('view-list').innerHTML = '';
+  document.getElementById('empty-state').style.display = '';
+  ['pill-method','pill-status','pill-time'].forEach(id => document.getElementById(id).style.display='none');
+  toast('已清空', 'info');
+}
+
+function copyOutput() {
+  if (!lastOutput) { toast('暂无内容可复制', 'info'); return; }
+  navigator.clipboard.writeText(lastOutput).then(() => toast('已复制到剪贴板', 'success'));
+}
+
+let toastTimer;
+function toast(msg, type='info') {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.className = `toast ${type} show`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+// ── 初始化 ──
+window.onload = () => {
+  switchView('list');
+  refreshCategoryDropdowns();
+};
+</script>
+</body>
+</html>

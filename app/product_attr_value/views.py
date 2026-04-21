@@ -71,10 +71,23 @@ class ProductAttrValueViewSet(ViewSet):
             return success_response(data=serializer.data, message='修改成功')
         return error_response(message='修改失败', errors=serializer.errors)
 
+    # ════════════════════════════════════════════════════════════
+    # [DEPRECATED] delete_attr_value — 商品属性值逻辑删除接口（已弃用）
+    #
+    # 弃用原因：
+    #   update_attr_value（PATCH）已可覆盖属性值的所有修改场景；
+    #   单独的删除入口容易造成数据不完整（商品缺少必填属性值），
+    #   故弃用此接口，统一通过 update 操作维护属性值。
+    #
+    # 改动说明（2026-04-22）：
+    #   • HTTP 方法保持 DELETE 不变，不影响已有调用方。
+    #   • 业务逻辑代码完整保留，接口仍可正常响应，
+    #     仅通过注释声明弃用状态，提示后续开发者不要再扩展此入口。
+    # ════════════════════════════════════════════════════════════
     @action(methods=['DELETE'], detail=True, url_path='delete')
     def delete_attr_value(self, request, pk=None):
         """
-        逻辑删除商品属性值
+        [DEPRECATED] 逻辑删除商品属性值 — 此接口已弃用，请改用 update_attr_value
         DELETE /api/attr-values/<id>/delete/
         """
         attr_value = self.get_attr_value_or_none(pk)

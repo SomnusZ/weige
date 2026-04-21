@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import Product
+from app.category.models import Category
 from app.dicts import DeleteStatus
 
 
@@ -40,9 +41,21 @@ class ProductCreateSerializer(ProductValidationMixin, serializers.ModelSerialize
         fields = ['product_name', 'category', 'product_price', 'product_image', 'product_stock']
 
     def validate_category(self, value):
-        """所属品类：必须存在且未被逻辑删除"""
+        """
+        所属品类校验：
+        1. 品类必须存在且未被逻辑删除
+        2. 品类必须是叶子节点（无子品类）
+           背景：商品是具体的实体，应挂在最小粒度的品类（叶子节点）上。
+                叶子节点同时持有该品类的属性定义模板，商品在此填写
+                对应的属性值，形成完整的 EAV 数据链路。
+                若允许商品挂在非叶子节点，则无法对应到具体的属性定义，
+                商品的动态属性将无从录入。
+        """
         if value.is_delete == DeleteStatus.DELETED:
             raise serializers.ValidationError('所属品类不存在或已被删除')
+        # 检查是否为叶子节点：若存在未删除的子品类，则为非叶子节点，拒绝操作
+        if Category.objects.filter(parent=value, is_delete=DeleteStatus.NORMAL).exists():
+            raise serializers.ValidationError('只能选择末级品类（该品类下还有子品类）')
         return value
 
 

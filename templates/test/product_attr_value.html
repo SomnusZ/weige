@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ProductAttrValue API · 测试台</title>
+<style>
+:root {
+  --bg: #0f1117; --bg2: #1a1d27; --bg3: #22263a;
+  --border: #2e3250; --accent: #6c63ff; --accent2: #818cf8;
+  --green: #34d399; --orange: #fb923c; --red: #f87171; --blue: #60a5fa;
+  --yellow: #fbbf24; --purple: #c084fc;
+  --text: #e2e8f0; --text2: #94a3b8; --text3: #64748b;
+  --radius: 12px; --radius-sm: 8px; --shadow: 0 4px 24px rgba(0,0,0,0.4);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif; background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+
+.topbar { display:flex; align-items:center; padding:0 24px; height:56px; background:var(--bg2); border-bottom:1px solid var(--border); flex-shrink:0; gap:16px; }
+.logo { display:flex; align-items:center; gap:10px; font-size:16px; font-weight:700; color:var(--accent2); }
+.logo-icon { width:28px; height:28px; background:linear-gradient(135deg,var(--accent),var(--accent2)); border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:14px; }
+.badge { font-size:11px; padding:2px 8px; border-radius:20px; background:rgba(108,99,255,0.2); color:var(--accent2); border:1px solid rgba(108,99,255,0.3); }
+.topbar-right { margin-left:auto; display:flex; align-items:center; gap:12px; font-size:12px; color:var(--text3); }
+.dot { width:7px; height:7px; border-radius:50%; background:var(--green); box-shadow:0 0 6px var(--green); }
+
+.main { display:flex; flex:1; overflow:hidden; }
+
+.sidebar { width:220px; flex-shrink:0; background:var(--bg2); border-right:1px solid var(--border); display:flex; flex-direction:column; padding:16px 0; overflow-y:auto; }
+.sidebar-title { font-size:11px; font-weight:600; color:var(--text3); letter-spacing:1.5px; text-transform:uppercase; padding:0 16px 12px; }
+.nav-item { display:flex; align-items:center; gap:10px; padding:10px 16px; cursor:pointer; color:var(--text2); font-size:13px; position:relative; transition:all 0.2s; }
+.nav-item:hover { background:rgba(108,99,255,0.08); color:var(--text); }
+.nav-item.active { background:rgba(108,99,255,0.15); color:var(--accent2); }
+.nav-item.active::before { content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--accent); border-radius:0 2px 2px 0; }
+.method-tag { font-size:10px; font-weight:700; padding:2px 6px; border-radius:4px; letter-spacing:0.5px; flex-shrink:0; }
+.get   { background:rgba(96,165,250,0.15);  color:var(--blue); }
+.post  { background:rgba(52,211,153,0.15);  color:var(--green); }
+.patch { background:rgba(251,146,60,0.15);  color:var(--orange); }
+.del   { background:rgba(248,113,113,0.15); color:var(--red); }
+.divider { height:1px; background:var(--border); margin:4px 16px; }
+
+.form-area { flex:1; min-width:320px; max-width:500px; border-right:1px solid var(--border); display:flex; flex-direction:column; overflow:hidden; }
+.form-header { padding:20px 24px 16px; border-bottom:1px solid var(--border); flex-shrink:0; }
+.form-title { font-size:16px; font-weight:600; color:var(--text); margin-bottom:4px; }
+.form-endpoint { font-size:12px; color:var(--text3); font-family:'Cascadia Code','Fira Code',monospace; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.form-body { flex:1; padding:24px; overflow-y:auto; display:flex; flex-direction:column; gap:16px; }
+.form-panel { display:none; flex-direction:column; gap:16px; }
+.form-panel.active { display:flex; }
+
+.field { display:flex; flex-direction:column; gap:6px; }
+.field label { font-size:12px; font-weight:500; color:var(--text2); display:flex; align-items:center; gap:6px; }
+.required { color:var(--red); font-size:14px; }
+.field input, .field select {
+  background:var(--bg3); border:1px solid var(--border); border-radius:var(--radius-sm);
+  color:var(--text); font-size:13px; padding:10px 14px; outline:none;
+  transition:border-color 0.2s,box-shadow 0.2s; font-family:inherit; width:100%;
+}
+.field select option { background:var(--bg3); }
+.field input:focus, .field select:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(108,99,255,0.15); }
+.field input::placeholder { color:var(--text3); }
+.field-hint { font-size:11px; color:var(--text3); }
+select:disabled { opacity:0.5; cursor:not-allowed; }
+
+/* 动态值输入区 */
+.value-input-box {
+  border:1px solid var(--border); border-radius:var(--radius-sm);
+  padding:14px; background:var(--bg3); display:none; flex-direction:column; gap:10px;
+}
+.value-input-box.visible { display:flex; }
+.value-type-label { display:flex; align-items:center; gap:8px; font-size:12px; color:var(--text2); }
+.type-badge { font-size:11px; font-weight:600; padding:2px 8px; border-radius:4px; }
+.type-str   { background:rgba(96,165,250,0.15);  color:var(--blue); }
+.type-int   { background:rgba(251,146,60,0.15);  color:var(--orange); }
+.type-float { background:rgba(192,132,252,0.15); color:var(--purple); }
+.type-bool  { background:rgba(52,211,153,0.15);  color:var(--green); }
+.req-tag { font-size:11px; padding:2px 6px; border-radius:4px; background:rgba(248,113,113,0.12); color:var(--red); border:1px solid rgba(248,113,113,0.25); }
+
+/* 开关 */
+.toggle-row { display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:var(--bg); border:1px solid var(--border); border-radius:var(--radius-sm); }
+.toggle-label { font-size:13px; color:var(--text2); }
+.toggle-wrap { display:flex; align-items:center; gap:10px; }
+.toggle-status { font-size:12px; color:var(--text3); min-width:30px; text-align:right; transition:color 0.2s; }
+.toggle { position:relative; width:36px; height:20px; cursor:pointer; flex-shrink:0; }
+.toggle input { opacity:0; width:0; height:0; position:absolute; }
+.toggle-track { position:absolute; inset:0; background:var(--border); border-radius:20px; transition:background 0.2s; }
+.toggle input:checked + .toggle-track { background:var(--green); }
+.toggle-thumb { position:absolute; width:14px; height:14px; background:#fff; border-radius:50%; top:3px; left:3px; transition:transform 0.2s; box-shadow:0 1px 4px rgba(0,0,0,0.3); }
+.toggle input:checked ~ .toggle-thumb { transform:translateX(16px); }
+
+.btn-submit { margin-top:4px; padding:11px; border:none; border-radius:var(--radius-sm); font-size:13px; font-weight:600; cursor:pointer; transition:all 0.2s; display:flex; align-items:center; justify-content:center; gap:8px; }
+.btn-submit:hover { transform:translateY(-1px); filter:brightness(1.1); }
+.btn-submit:active { transform:translateY(0); }
+.btn-submit:disabled { opacity:0.6; cursor:not-allowed; transform:none; }
+.btn-get    { background:linear-gradient(135deg,#3b82f6,#1d4ed8); color:#fff; }
+.btn-post   { background:linear-gradient(135deg,#10b981,#059669); color:#fff; }
+.btn-patch  { background:linear-gradient(135deg,#f97316,#ea580c); color:#fff; }
+.btn-delete { background:linear-gradient(135deg,#ef4444,#dc2626); color:#fff; }
+
+.spinner { width:14px; height:14px; border:2px solid rgba(255,255,255,0.3); border-top-color:#fff; border-radius:50%; animation:spin 0.6s linear infinite; display:none; }
+.spinner-sm { width:10px; height:10px; border:2px solid rgba(130,140,248,0.3); border-top-color:var(--accent2); border-radius:50%; animation:spin 0.6s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+
+/* 响应区 */
+.response-area { flex:1; min-width:0; display:flex; flex-direction:column; overflow:hidden; }
+.response-header { padding:12px 20px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:10px; flex-shrink:0; background:var(--bg2); }
+.response-header-title { font-size:13px; font-weight:600; color:var(--text2); white-space:nowrap; }
+.view-tabs { display:flex; gap:4px; }
+.view-tab { padding:4px 12px; border-radius:6px; font-size:12px; cursor:pointer; color:var(--text3); transition:all 0.2s; border:1px solid transparent; }
+.view-tab.active { background:rgba(108,99,255,0.15); color:var(--accent2); border-color:rgba(108,99,255,0.3); }
+.meta-pills { display:flex; gap:6px; margin-left:auto; }
+.pill { font-size:11px; padding:3px 10px; border-radius:20px; background:var(--bg3); border:1px solid var(--border); color:var(--text2); }
+.pill-ok  { border-color:rgba(52,211,153,0.4);  color:var(--green); background:rgba(52,211,153,0.08); }
+.pill-err { border-color:rgba(248,113,113,0.4); color:var(--red);   background:rgba(248,113,113,0.08); }
+.copy-btn { padding:4px 12px; background:var(--bg3); border:1px solid var(--border); border-radius:var(--radius-sm); color:var(--text2); font-size:11px; cursor:pointer; transition:all 0.2s; white-space:nowrap; }
+.copy-btn:hover { border-color:var(--accent); color:var(--accent2); }
+
+.response-body { flex:1; overflow:hidden; position:relative; }
+#view-json { height:100%; display:none; }
+pre#output { height:100%; overflow-y:auto; padding:20px; font-family:'Cascadia Code','Fira Code','Consolas',monospace; font-size:12.5px; line-height:1.7; background:var(--bg); white-space:pre-wrap; word-break:break-all; }
+.j-key  { color:#818cf8; } .j-str { color:#34d399; } .j-num { color:#fb923c; } .j-bool { color:#60a5fa; } .j-null { color:#94a3b8; }
+
+/* 属性值列表视图 */
+#view-table { height:100%; display:none; overflow-y:auto; padding:16px 20px; }
+.table-header { font-size:11px; color:var(--text3); font-weight:600; letter-spacing:1px; text-transform:uppercase; padding-bottom:10px; border-bottom:1px solid var(--border); margin-bottom:12px; display:flex; align-items:center; justify-content:space-between; }
+.attr-row { background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius-sm); padding:12px 16px; margin-bottom:8px; display:grid; grid-template-columns:32px 1fr auto auto 80px; align-items:center; gap:12px; transition:border-color 0.2s; }
+.attr-row:hover { border-color:rgba(108,99,255,0.4); }
+.attr-row-id { font-size:11px; color:var(--text3); }
+.attr-row-name { font-size:13px; font-weight:500; color:var(--text); }
+.attr-row-value { font-size:13px; color:var(--yellow); font-family:'Cascadia Code','Fira Code',monospace; word-break:break-all; }
+.attr-row-value.null-val { color:var(--text3); font-style:italic; font-size:12px; }
+.attr-row-time { font-size:11px; color:var(--text3); text-align:right; }
+
+.empty-state { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; color:var(--text3); gap:12px; pointer-events:none; }
+.empty-icon { font-size:48px; opacity:0.3; }
+.empty-text { font-size:13px; }
+
+.toast { position:fixed; bottom:24px; right:24px; padding:10px 18px; border-radius:var(--radius-sm); font-size:13px; color:#fff; box-shadow:var(--shadow); transform:translateY(20px); opacity:0; transition:all 0.3s; z-index:999; pointer-events:none; }
+.toast.show { transform:translateY(0); opacity:1; }
+.toast.success { background:#059669; } .toast.error { background:#dc2626; } .toast.info { background:#2563eb; }
+
+::-webkit-scrollbar { width:4px; } ::-webkit-scrollbar-track { background:transparent; } ::-webkit-scrollbar-thumb { background:var(--border); border-radius:4px; }
+
+.warn-box { font-size:12px; color:var(--text3); line-height:1.6; padding:10px 12px; background:rgba(248,113,113,0.06); border:1px solid rgba(248,113,113,0.2); border-radius:8px; }
+.info-box  { font-size:12px; color:var(--text3); line-height:1.6; padding:10px 12px; background:rgba(96,165,250,0.06); border:1px solid rgba(96,165,250,0.2); border-radius:8px; }
+.section-label { font-size:11px; font-weight:600; color:var(--text3); text-transform:uppercase; letter-spacing:1px; padding-bottom:4px; border-bottom:1px solid var(--border); }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo"><div class="logo-icon">🔖</div>AttrValue API</div>
+  <span class="badge">TEST</span>
+  <div class="topbar-right"><div class="dot"></div><span>本地服务运行中 · 127.0.0.1:8000</span></div>
+</div>
+
+<div class="main">
+
+  <!-- 侧边栏 -->
+  <div class="sidebar">
+    <div class="sidebar-title">接口列表</div>
+    <div class="nav-item active" onclick="switchPanel('dir')"><span class="method-tag get">GET</span><span>查询属性值</span></div>
+    <div class="nav-item" onclick="switchPanel('create')"><span class="method-tag post">POST</span><span>新增属性值</span></div>
+    <div class="nav-item" onclick="switchPanel('update')"><span class="method-tag patch">PATCH</span><span>修改属性值</span></div>
+    <!-- DELETE 面板已移除：delete_attr_value 接口已弃用，请通过 update 修改属性值 -->
+    <div class="divider" style="margin-top:16px;"></div>
+    <div class="sidebar-title" style="margin-top:16px;">快捷操作</div>
+    <div class="nav-item" onclick="refreshProducts()" style="font-size:12px;"><span>🔄</span><span>刷新商品列表</span></div>
+    <div class="nav-item" onclick="clearOutput()" style="font-size:12px;"><span>🗑</span><span>清空响应区</span></div>
+  </div>
+
+  <!-- 表单区 -->
+  <div class="form-area">
+
+    <div id="header-dir" class="form-header">
+      <div class="form-title">查询商品属性值</div>
+      <div class="form-endpoint"><span class="method-tag get">GET</span>/api/attr-values/dir/?product_id=&lt;id&gt;</div>
+    </div>
+    <div id="header-create" class="form-header" style="display:none">
+      <div class="form-title">新增属性值</div>
+      <div class="form-endpoint"><span class="method-tag post">POST</span>/api/attr-values/create/</div>
+    </div>
+    <div id="header-update" class="form-header" style="display:none">
+      <div class="form-title">修改属性值</div>
+      <div class="form-endpoint"><span class="method-tag patch">PATCH</span>/api/attr-values/&lt;id&gt;/update/</div>
+    </div>
+    <!-- header-delete 已移除 -->
+
+    <div class="form-body">
+
+      <!-- ── 查询面板 ── -->
+      <div id="panel-dir" class="form-panel active">
+        <div class="field">
+          <label>选择商品 <span class="required">*</span></label>
+          <select id="dir-product">
+            <option value="">-- 请选择商品 --</option>
+          </select>
+          <span class="field-hint">查询该商品已录入的所有动态属性值</span>
+        </div>
+        <button class="btn-submit btn-get" id="btn-dir" onclick="dirAttrValue()">
+          <span class="spinner" id="sp-dir"></span>发起查询
+        </button>
+      </div>
+
+      <!-- ── 新增面板 ── -->
+      <div id="panel-create" class="form-panel">
+        <div class="section-label">第一步：选择商品与属性</div>
+        <div class="field">
+          <label>所属商品 <span class="required">*</span></label>
+          <select id="c-product" onchange="onCreateProductChange()">
+            <option value="">-- 请选择商品 --</option>
+          </select>
+          <span class="field-hint">创建后不可修改</span>
+        </div>
+        <div class="field">
+          <label>属性定义 <span class="required">*</span></label>
+          <select id="c-attr-def" disabled onchange="onCreateAttrDefChange()">
+            <option value="">-- 请先选择商品 --</option>
+          </select>
+          <span id="c-attr-def-hint" class="field-hint"></span>
+        </div>
+        <div class="section-label" style="margin-top:4px;">第二步：填写属性值</div>
+        <!-- 动态值输入区 -->
+        <div class="value-input-box" id="c-value-box">
+          <div class="value-type-label">
+            <span>属性类型：</span>
+            <span id="c-type-badge" class="type-badge"></span>
+            <span id="c-req-tag" class="req-tag" style="display:none">必填</span>
+          </div>
+          <!-- str -->
+          <div id="c-input-str" style="display:none">
+            <input id="c-val-str" type="text" placeholder="请输入文本值">
+          </div>
+          <!-- int -->
+          <div id="c-input-int" style="display:none">
+            <input id="c-val-int" type="number" step="1" placeholder="请输入整数">
+          </div>
+          <!-- float -->
+          <div id="c-input-float" style="display:none">
+            <input id="c-val-float" type="number" step="any" placeholder="请输入小数">
+          </div>
+          <!-- bool -->
+          <div id="c-input-bool" style="display:none">
+            <div class="toggle-row">
+              <span class="toggle-label">布尔值</span>
+              <div class="toggle-wrap">
+                <span class="toggle-status" id="c-bool-status">false</span>
+                <label class="toggle">
+                  <input type="checkbox" id="c-val-bool" onchange="updateBoolStatus('c-val-bool','c-bool-status')">
+                  <div class="toggle-track"></div>
+                  <div class="toggle-thumb"></div>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+        <button class="btn-submit btn-post" id="btn-create" onclick="createAttrValue()">
+          <span class="spinner" id="sp-create"></span>创建属性值
+        </button>
+      </div>
+
+      <!-- ── 修改面板 ── -->
+      <div id="panel-update" class="form-panel">
+        <div class="section-label">第一步：定位属性值记录</div>
+        <div class="field">
+          <label>所属商品</label>
+          <select id="u-product" onchange="loadAttrValuesFor('u-product','u-attr-value','u-attr-value-hint')">
+            <option value="">-- 请选择商品 --</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>选择属性值记录 <span class="required">*</span></label>
+          <select id="u-attr-value" disabled onchange="onUpdateAttrValueChange()">
+            <option value="">-- 请先选择商品 --</option>
+          </select>
+          <span id="u-attr-value-hint" class="field-hint"></span>
+        </div>
+        <div class="section-label" style="margin-top:4px;">第二步：修改值</div>
+        <div class="info-box">ℹ️ 只允许修改属性值本身，不可更换商品或属性定义。</div>
+        <div class="value-input-box" id="u-value-box">
+          <div class="value-type-label">
+            <span>属性：</span>
+            <span id="u-attr-name-label" style="color:var(--text);font-weight:500"></span>
+            <span id="u-type-badge" class="type-badge"></span>
+          </div>
+          <div id="u-input-str"   style="display:none"><input id="u-val-str"   type="text"   placeholder="新文本值"></div>
+          <div id="u-input-int"   style="display:none"><input id="u-val-int"   type="number" step="1"   placeholder="新整数值"></div>
+          <div id="u-input-float" style="display:none"><input id="u-val-float" type="number" step="any" placeholder="新小数值"></div>
+          <div id="u-input-bool"  style="display:none">
+            <div class="toggle-row">
+              <span class="toggle-label">布尔值</span>
+              <div class="toggle-wrap">
+                <span class="toggle-status" id="u-bool-status">false</span>
+                <label class="toggle">
+                  <input type="checkbox" id="u-val-bool" onchange="updateBoolStatus('u-val-bool','u-bool-status')">
+                  <div class="toggle-track"></div>
+                  <div class="toggle-thumb"></div>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+        <button class="btn-submit btn-patch" id="btn-update" onclick="updateAttrValue()">
+          <span class="spinner" id="sp-update"></span>提交修改
+        </button>
+      </div>
+
+      <!-- panel-delete 已移除：delete_attr_value 接口已弃用 -->
+
+    </div>
+  </div>
+
+  <!-- 响应区 -->
+  <div class="response-area">
+    <div class="response-header">
+      <span class="response-header-title">响应结果</span>
+      <div class="view-tabs">
+        <div class="view-tab active" id="tab-table" onclick="switchView('table')">▦ 属性表</div>
+        <div class="view-tab" id="tab-json"  onclick="switchView('json')">{ } JSON</div>
+      </div>
+      <div class="meta-pills">
+        <div class="pill" id="pill-method" style="display:none"></div>
+        <div class="pill" id="pill-status" style="display:none"></div>
+        <div class="pill" id="pill-time"   style="display:none"></div>
+      </div>
+      <button class="copy-btn" onclick="copyOutput()">复制</button>
+    </div>
+    <div class="response-body">
+      <div class="empty-state" id="empty-state">
+        <div class="empty-icon">🔖</div>
+        <div class="empty-text">选择商品后发起查询，属性值将显示在这里</div>
+      </div>
+      <div id="view-table"></div>
+      <div id="view-json"><pre id="output"></pre></div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const BASE = '/api';
+let allProducts  = [];          // 商品列表
+let lastOutput   = '';
+let currentView  = 'table';
+
+// 缓存
+const attrDefsCache   = {};     // categoryId → [attrDef, ...]
+const attrValuesCache = {};     // productId  → [attrValue, ...]
+const attrDefMap      = {};     // attrDefId  → { attr_name, value_type, is_required }
+const productMap      = {};     // productId  → { product_name, category_id }
+
+const TYPE_LABELS = { str:'str · 文本', int:'int · 整数', float:'float · 小数', bool:'bool · 布尔' };
+const TYPE_CLASS  = { str:'type-str',  int:'type-int',  float:'type-float',  bool:'type-bool' };
+
+// ── 面板切换（delete 面板已移除）──
+function switchPanel(name) {
+  ['dir','create','update'].forEach(n => {
+    document.getElementById(`panel-${n}`).classList.toggle('active', n === name);
+    document.getElementById(`header-${n}`).style.display = n === name ? '' : 'none';
+  });
+  document.querySelectorAll('.nav-item').forEach((el, i) => {
+    el.classList.toggle('active', i === ['dir','create','update'].indexOf(name));
+  });
+}
+
+// ── 视图切换 ──
+function switchView(view) {
+  currentView = view;
+  document.getElementById('tab-table').classList.toggle('active', view === 'table');
+  document.getElementById('tab-json').classList.toggle('active',  view === 'json');
+  document.getElementById('view-table').style.display = view === 'table' ? 'block' : 'none';
+  document.getElementById('view-json').style.display  = view === 'json'  ? 'block' : 'none';
+}
+
+// ── 布尔开关状态文字 ──
+function updateBoolStatus(checkId, statusId) {
+  const checked = document.getElementById(checkId).checked;
+  const el = document.getElementById(statusId);
+  el.textContent = checked ? 'true' : 'false';
+  el.style.color = checked ? 'var(--green)' : 'var(--text3)';
+}
+
+// ── 填充商品下拉（delete 面板已移除，d-product 不再需要）──
+function populateProductSelects() {
+  ['dir-product','c-product','u-product'].forEach(id => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    const cur = sel.value;
+    sel.innerHTML = `<option value="">-- 请选择商品 --</option>`;
+    allProducts.forEach(p => {
+      sel.innerHTML += `<option value="${p.id}">${p.product_name}（ID: ${p.id}）</option>`;
+    });
+    if (cur) sel.value = cur;
+  });
+}
+
+// ── 新增：商品选择后，加载该品类的属性定义 ──
+async function onCreateProductChange() {
+  const productId = document.getElementById('c-product').value;
+  const attrDefSel  = document.getElementById('c-attr-def');
+  const hint        = document.getElementById('c-attr-def-hint');
+  const valueBox    = document.getElementById('c-value-box');
+
+  // 重置属性定义和值输入区
+  attrDefSel.innerHTML = `<option value="">-- 加载中... --</option>`;
+  attrDefSel.disabled = true;
+  valueBox.classList.remove('visible');
+  hint.textContent = '';
+
+  if (!productId) {
+    attrDefSel.innerHTML = `<option value="">-- 请先选择商品 --</option>`;
+    return;
+  }
+
+  const product = productMap[productId];
+  if (!product) return;
+
+  const catId = product.category_id;
+  try {
+    if (!attrDefsCache[catId]) {
+      const res  = await fetch(`${BASE}/attr-defs/dir/?category_id=${catId}`);
+      const data = await res.json();
+      if (data.success) {
+        attrDefsCache[catId] = data.data || [];
+        attrDefsCache[catId].forEach(a => {
+          attrDefMap[a.id] = { attr_name: a.attr_name, value_type: a.value_type, is_required: a.is_required };
+        });
+      }
+    }
+
+    const defs = attrDefsCache[catId] || [];
+    attrDefSel.innerHTML = `<option value="">-- 请选择属性 --</option>`;
+    if (defs.length === 0) {
+      attrDefSel.innerHTML += `<option value="" disabled>该品类暂无属性定义</option>`;
+      hint.textContent = '该品类暂无属性定义，请先在 AttrDef 页面创建';
+    } else {
+      defs.forEach(a => {
+        const typeLabel = TYPE_LABELS[a.value_type] || a.value_type;
+        const reqLabel  = a.is_required ? ' · 必填' : '';
+        attrDefSel.innerHTML += `<option value="${a.id}">${a.attr_name}（${typeLabel}${reqLabel}）</option>`;
+      });
+      hint.textContent = `共 ${defs.length} 个属性定义`;
+    }
+    attrDefSel.disabled = false;
+  } catch(e) {
+    attrDefSel.innerHTML = `<option value="">-- 加载失败 --</option>`;
+    hint.textContent = '加载失败，请重试';
+  }
+}
+
+// ── 新增：属性定义选择后，显示对应值输入框 ──
+function onCreateAttrDefChange() {
+  const attrDefId = document.getElementById('c-attr-def').value;
+  const valueBox  = document.getElementById('c-value-box');
+
+  // 隐藏所有输入区
+  ['str','int','float','bool'].forEach(t => {
+    document.getElementById(`c-input-${t}`).style.display = 'none';
+  });
+  // 清空值
+  document.getElementById('c-val-str').value   = '';
+  document.getElementById('c-val-int').value   = '';
+  document.getElementById('c-val-float').value = '';
+  document.getElementById('c-val-bool').checked = false;
+  updateBoolStatus('c-val-bool','c-bool-status');
+
+  if (!attrDefId) { valueBox.classList.remove('visible'); return; }
+
+  const def = attrDefMap[attrDefId];
+  if (!def) { valueBox.classList.remove('visible'); return; }
+
+  // 显示类型标签
+  const badge = document.getElementById('c-type-badge');
+  badge.textContent  = TYPE_LABELS[def.value_type] || def.value_type;
+  badge.className    = `type-badge ${TYPE_CLASS[def.value_type] || ''}`;
+  const reqTag = document.getElementById('c-req-tag');
+  reqTag.style.display = def.is_required ? '' : 'none';
+
+  // 显示对应输入框
+  document.getElementById(`c-input-${def.value_type}`).style.display = '';
+  valueBox.classList.add('visible');
+}
+
+// ── 修改/删除：商品选择后加载该商品的属性值 ──
+async function loadAttrValuesFor(productSelectId, attrValueSelectId, hintId) {
+  const productId   = document.getElementById(productSelectId).value;
+  const attrValSel  = document.getElementById(attrValueSelectId);
+  const hint        = document.getElementById(hintId);
+
+  attrValSel.innerHTML = `<option value="">-- 加载中... --</option>`;
+  attrValSel.disabled = true;
+  if (hint) hint.textContent = '';
+
+  // 修改面板：同时隐藏值编辑区
+  if (attrValueSelectId === 'u-attr-value') {
+    document.getElementById('u-value-box').classList.remove('visible');
+  }
+
+  if (!productId) {
+    attrValSel.innerHTML = `<option value="">-- 请先选择商品 --</option>`;
+    return;
+  }
+
+  try {
+    // 清除缓存以获取最新数据
+    delete attrValuesCache[productId];
+    const res  = await fetch(`${BASE}/attr-values/dir/?product_id=${productId}`);
+    const data = await res.json();
+    if (data.success) {
+      attrValuesCache[productId] = data.data || [];
+      fillAttrValueSelect(attrValSel, attrValuesCache[productId], hint);
+    } else {
+      attrValSel.innerHTML = `<option value="">-- 加载失败 --</option>`;
+      if (hint) hint.textContent = data.message || '加载失败';
+    }
+  } catch(e) {
+    attrValSel.innerHTML = `<option value="">-- 网络错误 --</option>`;
+  }
+}
+
+function fillAttrValueSelect(sel, list, hint) {
+  sel.innerHTML = `<option value="">-- 请选择属性值记录 --</option>`;
+  if (list.length === 0) {
+    sel.innerHTML += `<option value="" disabled>该商品暂无属性值记录</option>`;
+    if (hint) hint.textContent = '暂无属性值记录';
+  } else {
+    list.forEach(v => {
+      const def = attrDefMap[v.attr_def_id];
+      const attrName = def ? def.attr_name : `属性${v.attr_def_id}`;
+      const val = getDisplayValue(v);
+      sel.innerHTML += `<option value="${v.id}">${attrName} = ${val}（ID: ${v.id}）</option>`;
+    });
+    if (hint) hint.textContent = `共 ${list.length} 条属性值`;
+  }
+  sel.disabled = false;
+}
+
+// ── 修改：属性值记录选择后，填充编辑表单 ──
+function onUpdateAttrValueChange() {
+  const attrValueId = document.getElementById('u-attr-value').value;
+  const valueBox    = document.getElementById('u-value-box');
+
+  ['str','int','float','bool'].forEach(t => {
+    document.getElementById(`u-input-${t}`).style.display = 'none';
+  });
+
+  if (!attrValueId) { valueBox.classList.remove('visible'); return; }
+
+  // 从缓存中找到这条记录
+  const productId = document.getElementById('u-product').value;
+  const list      = attrValuesCache[productId] || [];
+  const record    = list.find(v => v.id == attrValueId);
+  if (!record) { valueBox.classList.remove('visible'); return; }
+
+  const def = attrDefMap[record.attr_def_id];
+  if (!def) { valueBox.classList.remove('visible'); return; }
+
+  // 显示属性名和类型
+  document.getElementById('u-attr-name-label').textContent = def.attr_name;
+  const badge = document.getElementById('u-type-badge');
+  badge.textContent = TYPE_LABELS[def.value_type] || def.value_type;
+  badge.className   = `type-badge ${TYPE_CLASS[def.value_type] || ''}`;
+
+  // 显示对应输入框并预填当前值
+  const vtype = def.value_type;
+  document.getElementById(`u-input-${vtype}`).style.display = '';
+  if (vtype === 'str')   document.getElementById('u-val-str').value   = record.value_str   ?? '';
+  if (vtype === 'int')   document.getElementById('u-val-int').value   = record.value_int   ?? '';
+  if (vtype === 'float') document.getElementById('u-val-float').value = record.value_float ?? '';
+  if (vtype === 'bool') {
+    document.getElementById('u-val-bool').checked = !!record.value_bool;
+    updateBoolStatus('u-val-bool','u-bool-status');
+  }
+
+  valueBox.classList.add('visible');
+}
+
+// ── 取出记录的实际值（用于显示）──
+function getDisplayValue(record) {
+  if (record.value_str   !== null && record.value_str   !== undefined) return `"${record.value_str}"`;
+  if (record.value_int   !== null && record.value_int   !== undefined) return record.value_int;
+  if (record.value_float !== null && record.value_float !== undefined) return record.value_float;
+  if (record.value_bool  !== null && record.value_bool  !== undefined) return record.value_bool ? 'true' : 'false';
+  return 'null';
+}
+
+// ── 渲染属性表视图 ──
+function renderTableView(attrValues, productId) {
+  const el = document.getElementById('view-table');
+  const productName = productMap[productId]?.product_name || `商品 ID ${productId}`;
+
+  if (!attrValues || attrValues.length === 0) {
+    el.innerHTML = `
+      <div class="table-header"><span>「${productName}」的属性值 &nbsp;共 0 条</span></div>
+      <div style="padding:32px 0;text-align:center;color:var(--text3);font-size:13px;">该商品暂无属性值记录</div>`;
+    return;
+  }
+
+  let html = `<div class="table-header"><span>「${productName}」的属性值</span><span style="color:var(--text3);font-weight:400">共 ${attrValues.length} 条</span></div>`;
+  attrValues.forEach(v => {
+    const def      = attrDefMap[v.attr_def_id];
+    const name     = def ? def.attr_name : `属性定义 #${v.attr_def_id}`;
+    const vtype    = def ? def.value_type : '?';
+    const rawVal   = getDisplayValue(v);
+    const isNull   = rawVal === 'null';
+    const date     = v.create_time ? v.create_time.replace('T',' ').substring(0,16) : '';
+    html += `
+      <div class="attr-row">
+        <span class="attr-row-id">#${v.id}</span>
+        <div>
+          <div class="attr-row-name">${name}</div>
+          <span class="type-badge ${TYPE_CLASS[vtype]||''}" style="font-size:10px">${TYPE_LABELS[vtype]||vtype}</span>
+        </div>
+        <span class="attr-row-value ${isNull ? 'null-val' : ''}">${rawVal}</span>
+        <span></span>
+        <span class="attr-row-time">${date}</span>
+      </div>`;
+  });
+  el.innerHTML = html;
+}
+
+// ── JSON 高亮 ──
+function highlight(json) {
+  return json.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, m => {
+      if (/^"/.test(m)) return /:$/.test(m) ? `<span class="j-key">${m}</span>` : `<span class="j-str">${m}</span>`;
+      if (/true|false/.test(m)) return `<span class="j-bool">${m}</span>`;
+      if (/null/.test(m))       return `<span class="j-null">${m}</span>`;
+      return `<span class="j-num">${m}</span>`;
+    });
+}
+
+// ── 显示响应 ──
+function showResponse(method, status, ms, data, isDir = false, productId = null) {
+  document.getElementById('empty-state').style.display = 'none';
+  lastOutput = JSON.stringify(data, null, 2);
+  document.getElementById('output').innerHTML = highlight(lastOutput);
+
+  const mc = { GET:'get', POST:'post', PATCH:'patch', DELETE:'del' };
+  const pm = document.getElementById('pill-method');
+  pm.style.display = '';
+  pm.innerHTML = `<span class="method-tag ${mc[method]||''}">${method}</span>`;
+  const ps = document.getElementById('pill-status');
+  ps.style.display = '';
+  const ok = status >= 200 && status < 300;
+  ps.className = `pill ${ok ? 'pill-ok' : 'pill-err'}`;
+  ps.textContent = `${status} ${ok ? 'OK' : 'ERR'}`;
+  const pt = document.getElementById('pill-time');
+  pt.style.display = '';
+  pt.textContent = `${ms}ms`;
+
+  if (isDir && data.success && Array.isArray(data.data)) {
+    // 加载 attr_def 信息（若未缓存）
+    const pInfo = productMap[productId];
+    if (pInfo && !attrDefsCache[pInfo.category_id]) {
+      fetch(`${BASE}/attr-defs/dir/?category_id=${pInfo.category_id}`)
+        .then(r => r.json())
+        .then(d => {
+          if (d.success) {
+            attrDefsCache[pInfo.category_id] = d.data || [];
+            d.data.forEach(a => { attrDefMap[a.id] = { attr_name: a.attr_name, value_type: a.value_type, is_required: a.is_required }; });
+            renderTableView(data.data, productId);
+          }
+        });
+    } else {
+      renderTableView(data.data, productId);
+    }
+    switchView('table');
+  } else {
+    switchView('json');
+  }
+}
+
+// ── 通用请求 ──
+async function request(method, url, body, btnId, spId, isDir = false, productId = null) {
+  const btn = document.getElementById(btnId);
+  const sp  = document.getElementById(spId);
+  btn.disabled = true; sp.style.display = 'inline-block';
+  const t0 = Date.now();
+  try {
+    const opts = { method, headers: { 'Content-Type': 'application/json' } };
+    if (body) opts.body = JSON.stringify(body);
+    const res  = await fetch(url, opts);
+    const data = await res.json();
+    const ms   = Date.now() - t0;
+    showResponse(method, res.status, ms, data, isDir, productId);
+    toast(data.message || (res.ok ? '请求成功' : '请求失败'), res.ok ? 'success' : 'error');
+    if (res.ok && !isDir && productId) {
+      // 增删改后清缓存
+      delete attrValuesCache[productId];
+    }
+  } catch(e) {
+    showResponse(method, 0, Date.now()-t0, { error: e.message });
+    toast('网络错误：' + e.message, 'error');
+  } finally {
+    btn.disabled = false; sp.style.display = 'none';
+  }
+}
+
+// ── 各接口 ──
+function dirAttrValue() {
+  const productId = document.getElementById('dir-product').value;
+  if (!productId) { toast('请先选择商品', 'error'); return; }
+  delete attrValuesCache[productId];
+  request('GET', `${BASE}/attr-values/dir/?product_id=${productId}`, null, 'btn-dir', 'sp-dir', true, productId);
+}
+
+function createAttrValue() {
+  const productId = document.getElementById('c-product').value;
+  const attrDefId = document.getElementById('c-attr-def').value;
+  if (!productId) { toast('请选择商品', 'error'); return; }
+  if (!attrDefId) { toast('请选择属性定义', 'error'); return; }
+
+  const def = attrDefMap[attrDefId];
+  if (!def) { toast('属性定义数据异常', 'error'); return; }
+
+  const body = { product: parseInt(productId), attr_def: parseInt(attrDefId),
+                 value_str: null, value_int: null, value_float: null, value_bool: null };
+
+  const vtype = def.value_type;
+  if (vtype === 'str') {
+    const v = document.getElementById('c-val-str').value;
+    if (def.is_required && !v.trim()) { toast('该属性为必填项', 'error'); return; }
+    body.value_str = v.trim() || null;
+  } else if (vtype === 'int') {
+    const v = document.getElementById('c-val-int').value;
+    if (def.is_required && v === '') { toast('该属性为必填项', 'error'); return; }
+    body.value_int = v !== '' ? parseInt(v) : null;
+  } else if (vtype === 'float') {
+    const v = document.getElementById('c-val-float').value;
+    if (def.is_required && v === '') { toast('该属性为必填项', 'error'); return; }
+    body.value_float = v !== '' ? parseFloat(v) : null;
+  } else if (vtype === 'bool') {
+    body.value_bool = document.getElementById('c-val-bool').checked;
+  }
+
+  request('POST', `${BASE}/attr-values/create/`, body, 'btn-create', 'sp-create', false, parseInt(productId));
+}
+
+function updateAttrValue() {
+  const attrValueId = document.getElementById('u-attr-value').value;
+  const productId   = document.getElementById('u-product').value;
+  if (!attrValueId) { toast('请选择要修改的属性值', 'error'); return; }
+
+  const list   = attrValuesCache[productId] || [];
+  const record = list.find(v => v.id == attrValueId);
+  if (!record)  { toast('属性值记录未找到，请重新加载', 'error'); return; }
+
+  const def   = attrDefMap[record.attr_def_id];
+  if (!def)    { toast('属性定义数据异常', 'error'); return; }
+
+  const body  = { value_str: null, value_int: null, value_float: null, value_bool: null };
+  const vtype = def.value_type;
+  if (vtype === 'str')   body.value_str   = document.getElementById('u-val-str').value.trim()    || null;
+  if (vtype === 'int')   body.value_int   = document.getElementById('u-val-int').value   !== '' ? parseInt(document.getElementById('u-val-int').value)   : null;
+  if (vtype === 'float') body.value_float = document.getElementById('u-val-float').value !== '' ? parseFloat(document.getElementById('u-val-float').value) : null;
+  if (vtype === 'bool')  body.value_bool  = document.getElementById('u-val-bool').checked;
+
+  request('PATCH', `${BASE}/attr-values/${attrValueId}/update/`, body, 'btn-update', 'sp-update', false, productId ? parseInt(productId) : null);
+}
+
+// deleteAttrValue 已移除：对应接口已弃用，请通过 updateAttrValue 修改属性值
+
+// ── 加载所有商品 ──
+async function refreshProducts() {
+  try {
+    const res  = await fetch(`${BASE}/products/dir/`);
+    const data = await res.json();
+    if (data.success && data.data) {
+      allProducts = data.data;
+      allProducts.forEach(p => { productMap[p.id] = { product_name: p.product_name, category_id: p.category_id }; });
+      populateProductSelects();
+      toast(`已加载 ${allProducts.length} 件商品`, 'info');
+    }
+  } catch(e) { toast('商品列表加载失败', 'error'); }
+}
+
+// ── 工具 ──
+function clearOutput() {
+  document.getElementById('output').innerHTML = '';
+  document.getElementById('view-table').innerHTML = '';
+  document.getElementById('empty-state').style.display = '';
+  ['pill-method','pill-status','pill-time'].forEach(id => document.getElementById(id).style.display='none');
+  toast('已清空', 'info');
+}
+
+function copyOutput() {
+  if (!lastOutput) { toast('暂无内容可复制', 'info'); return; }
+  navigator.clipboard.writeText(lastOutput).then(() => toast('已复制到剪贴板', 'success'));
+}
+
+let toastTimer;
+function toast(msg, type='info') {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.className = `toast ${type} show`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+// ── 初始化 ──
+window.onload = () => {
+  switchView('table');
+  refreshProducts();
+};
+</script>
+</body>
+</html>

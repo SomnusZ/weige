@@ -65,10 +65,17 @@ class CategoryViewSet(ViewSet):
         """
         逻辑删除品类（is_delete 置为 True，不真正删除数据）
         DELETE /api/categories/<id>/delete/
+        子品类自动上移：直接子品类的 parent 改为被删品类的 parent
         """
         category = self.get_category_or_none(pk)
         if not category:
             return error_response(message="品类不存在或已被删除", status_code=status.HTTP_404_NOT_FOUND)
+
+        # 子品类上移：将直接子品类的父级改为当前品类的父级
+        Category.objects.filter(
+            parent=category,
+            is_delete=DeleteStatus.NORMAL
+        ).update(parent=category.parent)
 
         category.is_delete = DeleteStatus.DELETED
         category.save()

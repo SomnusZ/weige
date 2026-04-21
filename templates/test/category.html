@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Category API · 测试台</title>
+<style>
+:root {
+  --bg: #0f1117; --bg2: #1a1d27; --bg3: #22263a;
+  --border: #2e3250; --accent: #6c63ff; --accent2: #818cf8;
+  --green: #34d399; --orange: #fb923c; --red: #f87171; --blue: #60a5fa;
+  --text: #e2e8f0; --text2: #94a3b8; --text3: #64748b;
+  --radius: 12px; --radius-sm: 8px; --shadow: 0 4px 24px rgba(0,0,0,0.4);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif; background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+
+/* 顶部 */
+.topbar { display:flex; align-items:center; padding:0 24px; height:56px; background:var(--bg2); border-bottom:1px solid var(--border); flex-shrink:0; gap:16px; }
+.logo { display:flex; align-items:center; gap:10px; font-size:16px; font-weight:700; color:var(--accent2); }
+.logo-icon { width:28px; height:28px; background:linear-gradient(135deg,var(--accent),var(--accent2)); border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:14px; }
+.badge { font-size:11px; padding:2px 8px; border-radius:20px; background:rgba(108,99,255,0.2); color:var(--accent2); border:1px solid rgba(108,99,255,0.3); }
+.topbar-right { margin-left:auto; display:flex; align-items:center; gap:12px; font-size:12px; color:var(--text3); }
+.dot { width:7px; height:7px; border-radius:50%; background:var(--green); box-shadow:0 0 6px var(--green); }
+
+/* 主体 */
+.main { display:flex; flex:1; overflow:hidden; }
+
+/* 侧边栏 */
+.sidebar { width:220px; flex-shrink:0; background:var(--bg2); border-right:1px solid var(--border); display:flex; flex-direction:column; padding:16px 0; overflow-y:auto; }
+.sidebar-title { font-size:11px; font-weight:600; color:var(--text3); letter-spacing:1.5px; text-transform:uppercase; padding:0 16px 12px; }
+.nav-item { display:flex; align-items:center; gap:10px; padding:10px 16px; cursor:pointer; color:var(--text2); font-size:13px; position:relative; transition:all 0.2s; }
+.nav-item:hover { background:rgba(108,99,255,0.08); color:var(--text); }
+.nav-item.active { background:rgba(108,99,255,0.15); color:var(--accent2); }
+.nav-item.active::before { content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--accent); border-radius:0 2px 2px 0; }
+.method-tag { font-size:10px; font-weight:700; padding:2px 6px; border-radius:4px; letter-spacing:0.5px; flex-shrink:0; }
+.get   { background:rgba(96,165,250,0.15);  color:var(--blue); }
+.post  { background:rgba(52,211,153,0.15);  color:var(--green); }
+.patch { background:rgba(251,146,60,0.15);  color:var(--orange); }
+.del   { background:rgba(248,113,113,0.15); color:var(--red); }
+.divider { height:1px; background:var(--border); margin:4px 16px; }
+
+/* 表单区 */
+.form-area { flex:1; min-width:320px; max-width:480px; border-right:1px solid var(--border); display:flex; flex-direction:column; overflow:hidden; }
+.form-header { padding:20px 24px 16px; border-bottom:1px solid var(--border); flex-shrink:0; }
+.form-title { font-size:16px; font-weight:600; color:var(--text); margin-bottom:4px; }
+.form-endpoint { font-size:12px; color:var(--text3); font-family:'Cascadia Code','Fira Code',monospace; display:flex; align-items:center; gap:8px; }
+.form-body { flex:1; padding:24px; overflow-y:auto; display:flex; flex-direction:column; gap:16px; }
+.form-panel { display:none; flex-direction:column; gap:16px; }
+.form-panel.active { display:flex; }
+
+/* 表单控件 */
+.field { display:flex; flex-direction:column; gap:6px; }
+.field label { font-size:12px; font-weight:500; color:var(--text2); display:flex; align-items:center; gap:6px; }
+.required { color:var(--red); font-size:14px; }
+.field input, .field select {
+  background:var(--bg3); border:1px solid var(--border); border-radius:var(--radius-sm);
+  color:var(--text); font-size:13px; padding:10px 14px; outline:none;
+  transition:border-color 0.2s,box-shadow 0.2s; font-family:inherit; width:100%;
+}
+.field select option { background:var(--bg3); }
+.field input:focus, .field select:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(108,99,255,0.15); }
+.field input::placeholder { color:var(--text3); }
+.field-hint { font-size:11px; color:var(--text3); }
+
+.btn-submit { margin-top:4px; padding:11px; border:none; border-radius:var(--radius-sm); font-size:13px; font-weight:600; cursor:pointer; transition:all 0.2s; display:flex; align-items:center; justify-content:center; gap:8px; }
+.btn-submit:hover { transform:translateY(-1px); filter:brightness(1.1); }
+.btn-submit:active { transform:translateY(0); }
+.btn-submit:disabled { opacity:0.6; cursor:not-allowed; transform:none; }
+.btn-get    { background:linear-gradient(135deg,#3b82f6,#1d4ed8); color:#fff; }
+.btn-post   { background:linear-gradient(135deg,#10b981,#059669); color:#fff; }
+.btn-patch  { background:linear-gradient(135deg,#f97316,#ea580c); color:#fff; }
+.btn-delete { background:linear-gradient(135deg,#ef4444,#dc2626); color:#fff; }
+
+.spinner { width:14px; height:14px; border:2px solid rgba(255,255,255,0.3); border-top-color:#fff; border-radius:50%; animation:spin 0.6s linear infinite; display:none; }
+@keyframes spin { to { transform:rotate(360deg); } }
+
+/* 响应区 */
+.response-area { flex:0 0 520px; display:flex; flex-direction:column; overflow:hidden; }
+.response-header { padding:12px 20px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:10px; flex-shrink:0; background:var(--bg2); }
+.response-header-title { font-size:13px; font-weight:600; color:var(--text2); }
+.view-tabs { display:flex; gap:4px; }
+.view-tab { padding:4px 12px; border-radius:6px; font-size:12px; cursor:pointer; color:var(--text3); transition:all 0.2s; border:1px solid transparent; }
+.view-tab.active { background:rgba(108,99,255,0.15); color:var(--accent2); border-color:rgba(108,99,255,0.3); }
+.meta-pills { display:flex; gap:6px; margin-left:auto; }
+.pill { font-size:11px; padding:3px 10px; border-radius:20px; background:var(--bg3); border:1px solid var(--border); color:var(--text2); }
+.pill-ok  { border-color:rgba(52,211,153,0.4);  color:var(--green); background:rgba(52,211,153,0.08); }
+.pill-err { border-color:rgba(248,113,113,0.4); color:var(--red);   background:rgba(248,113,113,0.08); }
+.copy-btn { padding:4px 12px; background:var(--bg3); border:1px solid var(--border); border-radius:var(--radius-sm); color:var(--text2); font-size:11px; cursor:pointer; transition:all 0.2s; }
+.copy-btn:hover { border-color:var(--accent); color:var(--accent2); }
+
+.response-body { flex:1; overflow:hidden; position:relative; }
+
+/* JSON 视图 */
+#view-json { height:100%; display:none; }
+pre#output { height:100%; overflow-y:auto; padding:20px; font-family:'Cascadia Code','Fira Code','Consolas',monospace; font-size:12.5px; line-height:1.7; background:var(--bg); white-space:pre-wrap; word-break:break-all; }
+.j-key  { color:#818cf8; } .j-str { color:#34d399; } .j-num { color:#fb923c; } .j-bool { color:#60a5fa; } .j-null { color:#94a3b8; }
+
+/* 树形视图 */
+#view-tree { height:100%; display:none; overflow-y:auto; padding:20px; }
+.tree-node { user-select:none; }
+.tree-row { display:flex; align-items:center; gap:8px; padding:5px 8px; border-radius:6px; cursor:pointer; transition:background 0.15s; font-size:13px; }
+.tree-row:hover { background:rgba(108,99,255,0.08); }
+.tree-toggle { width:16px; height:16px; display:flex; align-items:center; justify-content:center; font-size:10px; color:var(--text3); transition:transform 0.2s; flex-shrink:0; }
+.tree-toggle.open { transform:rotate(90deg); }
+.tree-icon { font-size:14px; flex-shrink:0; }
+.tree-name { font-weight:500; color:var(--text); }
+.tree-id { font-size:11px; color:var(--text3); margin-left:4px; }
+.tree-children { padding-left:24px; overflow:hidden; }
+.tree-children.collapsed { display:none; }
+
+/* 空状态 */
+.empty-state { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; color:var(--text3); gap:12px; pointer-events:none; }
+.empty-icon { font-size:48px; opacity:0.3; }
+.empty-text { font-size:13px; }
+
+/* Toast */
+.toast { position:fixed; bottom:24px; right:24px; padding:10px 18px; border-radius:var(--radius-sm); font-size:13px; color:#fff; box-shadow:var(--shadow); transform:translateY(20px); opacity:0; transition:all 0.3s; z-index:999; pointer-events:none; }
+.toast.show { transform:translateY(0); opacity:1; }
+.toast.success { background:#059669; } .toast.error { background:#dc2626; } .toast.info { background:#2563eb; }
+
+::-webkit-scrollbar { width:4px; } ::-webkit-scrollbar-track { background:transparent; } ::-webkit-scrollbar-thumb { background:var(--border); border-radius:4px; }
+
+.warn-box { font-size:12px; color:var(--text3); line-height:1.6; padding:10px 12px; background:rgba(248,113,113,0.06); border:1px solid rgba(248,113,113,0.2); border-radius:8px; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo"><div class="logo-icon">🗂</div>Category API</div>
+  <span class="badge">TEST</span>
+  <div class="topbar-right"><div class="dot"></div><span>本地服务运行中 · 127.0.0.1:8000</span></div>
+</div>
+
+<div class="main">
+
+  <!-- 侧边栏 -->
+  <div class="sidebar">
+    <div class="sidebar-title">接口列表</div>
+    <div class="nav-item active" onclick="switchPanel('dir')"><span class="method-tag get">GET</span><span>查询所有品类</span></div>
+    <div class="nav-item" onclick="switchPanel('create')"><span class="method-tag post">POST</span><span>新增品类</span></div>
+    <div class="nav-item" onclick="switchPanel('update')"><span class="method-tag patch">PATCH</span><span>修改品类</span></div>
+    <div class="nav-item" onclick="switchPanel('delete')"><span class="method-tag del">DELETE</span><span>删除品类</span></div>
+    <div class="divider" style="margin-top:16px;"></div>
+    <div class="sidebar-title" style="margin-top:16px;">快捷操作</div>
+    <div class="nav-item" onclick="dirCategory()" style="font-size:12px;"><span>🔄</span><span>刷新品类列表</span></div>
+    <div class="nav-item" onclick="clearOutput()" style="font-size:12px;"><span>🗑</span><span>清空响应区</span></div>
+  </div>
+
+  <!-- 表单区 -->
+  <div class="form-area">
+
+    <div id="header-dir" class="form-header">
+      <div class="form-title">查询所有品类</div>
+      <div class="form-endpoint"><span class="method-tag get">GET</span>/api/categories/dir/</div>
+    </div>
+    <div id="header-create" class="form-header" style="display:none">
+      <div class="form-title">新增品类</div>
+      <div class="form-endpoint"><span class="method-tag post">POST</span>/api/categories/create/</div>
+    </div>
+    <div id="header-update" class="form-header" style="display:none">
+      <div class="form-title">修改品类</div>
+      <div class="form-endpoint"><span class="method-tag patch">PATCH</span>/api/categories/&lt;id&gt;/update/</div>
+    </div>
+    <div id="header-delete" class="form-header" style="display:none">
+      <div class="form-title">删除品类</div>
+      <div class="form-endpoint"><span class="method-tag del">DELETE</span>/api/categories/&lt;id&gt;/delete/</div>
+    </div>
+
+    <div class="form-body">
+
+      <!-- 查询 -->
+      <div id="panel-dir" class="form-panel active">
+        <p style="font-size:13px;color:var(--text2);line-height:1.6;">返回所有未删除的品类，响应区将以树形结构展示。</p>
+        <button class="btn-submit btn-get" id="btn-dir" onclick="dirCategory()">
+          <span class="spinner" id="sp-dir"></span>发起查询
+        </button>
+      </div>
+
+      <!-- 新增 -->
+      <div id="panel-create" class="form-panel">
+        <div class="field">
+          <label>品类名称 <span class="required">*</span></label>
+          <input id="c-name" type="text" placeholder="例：大衣">
+        </div>
+        <div class="field">
+          <label>父级品类</label>
+          <select id="c-parent">
+            <option value="">-- 设为顶级品类 --</option>
+          </select>
+          <span class="field-hint">留空则为顶级品类，下拉列表实时从数据库加载</span>
+        </div>
+        <button class="btn-submit btn-post" id="btn-create" onclick="createCategory()">
+          <span class="spinner" id="sp-create"></span>创建品类
+        </button>
+      </div>
+
+      <!-- 修改 -->
+      <div id="panel-update" class="form-panel">
+        <div class="field">
+          <label>选择要修改的品类 <span class="required">*</span></label>
+          <select id="u-id">
+            <option value="">-- 请选择品类 --</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>新名称</label>
+          <input id="u-name" type="text" placeholder="留空则不修改名称">
+        </div>
+        <div class="field">
+          <label>新父级品类</label>
+          <select id="u-parent">
+            <option value="">-- 不修改父级 --</option>
+            <option value="0">🔝 提升为顶级品类</option>
+          </select>
+          <span class="field-hint">选择"提升为顶级品类"可移除父级关联</span>
+        </div>
+        <button class="btn-submit btn-patch" id="btn-update" onclick="updateCategory()">
+          <span class="spinner" id="sp-update"></span>提交修改
+        </button>
+      </div>
+
+      <!-- 删除 -->
+      <div id="panel-delete" class="form-panel">
+        <div class="field">
+          <label>选择要删除的品类 <span class="required">*</span></label>
+          <select id="d-id">
+            <option value="">-- 请选择品类 --</option>
+          </select>
+        </div>
+        <p class="warn-box">⚠️ 逻辑删除，数据不会真正移除。删除后品类从列表中隐藏。</p>
+        <button class="btn-submit btn-delete" id="btn-delete" onclick="deleteCategory()">
+          <span class="spinner" id="sp-delete"></span>确认删除
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 响应区 -->
+  <div class="response-area">
+    <div class="response-header">
+      <span class="response-header-title">响应结果</span>
+      <div class="view-tabs">
+        <div class="view-tab active" id="tab-tree" onclick="switchView('tree')">🌲 树形</div>
+        <div class="view-tab" id="tab-json" onclick="switchView('json')">{ } JSON</div>
+      </div>
+      <div class="meta-pills">
+        <div class="pill" id="pill-method" style="display:none"></div>
+        <div class="pill" id="pill-status" style="display:none"></div>
+        <div class="pill" id="pill-time"   style="display:none"></div>
+      </div>
+      <button class="copy-btn" onclick="copyOutput()">复制</button>
+    </div>
+    <div class="response-body">
+      <div class="empty-state" id="empty-state">
+        <div class="empty-icon">📭</div>
+        <div class="empty-text">发起请求后，响应结果将显示在这里</div>
+      </div>
+      <div id="view-tree"></div>
+      <div id="view-json"><pre id="output"></pre></div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const BASE = '/api';
+let allCategories = [];
+let lastOutput = '';
+let currentView = 'tree';
+
+// ── 面板切换 ──
+function switchPanel(name) {
+  ['dir','create','update','delete'].forEach(n => {
+    document.getElementById(`panel-${n}`).classList.toggle('active', n === name);
+    document.getElementById(`header-${n}`).style.display = n === name ? '' : 'none';
+  });
+  document.querySelectorAll('.nav-item').forEach((el, i) => {
+    el.classList.toggle('active', i === ['dir','create','update','delete'].indexOf(name));
+  });
+  // 切换到需要下拉列表的面板时刷新选项
+  if (['create','update','delete'].includes(name)) refreshDropdowns();
+}
+
+// ── 视图切换（树形 / JSON）──
+function switchView(view) {
+  currentView = view;
+  document.getElementById('tab-tree').classList.toggle('active', view === 'tree');
+  document.getElementById('tab-json').classList.toggle('active', view === 'json');
+  document.getElementById('view-tree').style.display = view === 'tree' ? 'block' : 'none';
+  document.getElementById('view-json').style.display = view === 'json' ? 'block' : 'none';
+}
+
+// ── 刷新所有下拉选项 ──
+function refreshDropdowns() {
+  const selects = {
+    'c-parent': { placeholder: '-- 设为顶级品类 --', extra: [] },
+    'u-id':     { placeholder: '-- 请选择品类 --',    extra: [] },
+    'u-parent': { placeholder: '-- 不修改父级 --',    extra: [{ value:'0', label:'🔝 提升为顶级品类' }] },
+    'd-id':     { placeholder: '-- 请选择品类 --',    extra: [] },
+  };
+  Object.entries(selects).forEach(([id, cfg]) => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    const cur = sel.value;
+    sel.innerHTML = `<option value="">${cfg.placeholder}</option>`;
+    cfg.extra.forEach(e => sel.innerHTML += `<option value="${e.value}">${e.label}</option>`);
+    allCategories.forEach(c => {
+      const label = c.parent_name ? `${c.parent_name} / ${c.category_name}` : c.category_name;
+      sel.innerHTML += `<option value="${c.id}">${label}（ID: ${c.id}）</option>`;
+    });
+    sel.value = cur;
+  });
+}
+
+// ── 构建树形结构 ──
+function buildTree(list) {
+  const map = {};
+  const roots = [];
+  list.forEach(c => map[c.id] = { ...c, children: [] });
+  list.forEach(c => {
+    if (c.parent_id && map[c.parent_id]) map[c.parent_id].children.push(map[c.id]);
+    else roots.push(map[c.id]);
+  });
+  return roots;
+}
+
+// ── 渲染树形节点 ──
+function renderTree(nodes, level = 0) {
+  if (!nodes.length) return '';
+  return nodes.map(node => {
+    const hasChildren = node.children.length > 0;
+    const icon = hasChildren ? '📁' : '📄';
+    const toggleIcon = hasChildren ? '▶' : '';
+    const nodeId = `node-${node.id}`;
+    return `
+      <div class="tree-node">
+        <div class="tree-row" onclick="toggleNode('${nodeId}', ${hasChildren})">
+          <span class="tree-toggle ${hasChildren ? '' : 'invisible'}" id="toggle-${nodeId}">${toggleIcon}</span>
+          <span class="tree-icon">${icon}</span>
+          <span class="tree-name">${node.category_name}</span>
+          <span class="tree-id">ID: ${node.id}</span>
+        </div>
+        ${hasChildren ? `<div class="tree-children collapsed" id="${nodeId}">${renderTree(node.children, level+1)}</div>` : ''}
+      </div>`;
+  }).join('');
+}
+
+function toggleNode(nodeId, hasChildren) {
+  if (!hasChildren) return;
+  const el = document.getElementById(nodeId);
+  const toggle = document.getElementById(`toggle-${nodeId}`);
+  const collapsed = el.classList.toggle('collapsed');
+  toggle.classList.toggle('open', !collapsed);
+}
+
+// ── 展示树形 ──
+function showTree(categories) {
+  const tree = buildTree(categories);
+  const treeEl = document.getElementById('view-tree');
+  treeEl.innerHTML = tree.length
+    ? renderTree(tree)
+    : '<div style="padding:24px;color:var(--text3);font-size:13px;">暂无品类数据</div>';
+}
+
+// ── JSON 语法高亮 ──
+function highlight(json) {
+  return json.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, m => {
+      if (/^"/.test(m)) return /:$/.test(m) ? `<span class="j-key">${m}</span>` : `<span class="j-str">${m}</span>`;
+      if (/true|false/.test(m)) return `<span class="j-bool">${m}</span>`;
+      if (/null/.test(m))       return `<span class="j-null">${m}</span>`;
+      return `<span class="j-num">${m}</span>`;
+    });
+}
+
+// ── 显示响应 ──
+function showResponse(method, status, ms, data, isDir = false) {
+  document.getElementById('empty-state').style.display = 'none';
+  lastOutput = JSON.stringify(data, null, 2);
+  document.getElementById('output').innerHTML = highlight(lastOutput);
+
+  const methodColors = { GET:'get', POST:'post', PATCH:'patch', DELETE:'del' };
+  const pm = document.getElementById('pill-method');
+  pm.style.display = '';
+  pm.innerHTML = `<span class="method-tag ${methodColors[method]||''}">${method}</span>`;
+  const ps = document.getElementById('pill-status');
+  ps.style.display = '';
+  const ok = status >= 200 && status < 300;
+  ps.className = `pill ${ok ? 'pill-ok' : 'pill-err'}`;
+  ps.textContent = `${status} ${ok ? 'OK' : 'ERR'}`;
+  const pt = document.getElementById('pill-time');
+  pt.style.display = '';
+  pt.textContent = `${ms}ms`;
+
+  if (isDir && data.success && data.data) {
+    allCategories = data.data;
+    showTree(data.data);
+    switchView('tree');
+  } else {
+    switchView('json');
+  }
+}
+
+// ── 通用请求 ──
+async function request(method, url, body, btnId, spId, isDir = false) {
+  const btn = document.getElementById(btnId);
+  const sp  = document.getElementById(spId);
+  btn.disabled = true; sp.style.display = 'inline-block';
+  const t0 = Date.now();
+  try {
+    const opts = { method, headers: { 'Content-Type': 'application/json' } };
+    if (body) opts.body = JSON.stringify(body);
+    const res  = await fetch(url, opts);
+    const data = await res.json();
+    const ms   = Date.now() - t0;
+    showResponse(method, res.status, ms, data, isDir);
+    toast(data.message || (res.ok ? '请求成功' : '请求失败'), res.ok ? 'success' : 'error');
+    if (res.ok && !isDir) { dirCategory(); } // 增删改后自动刷新下拉
+  } catch(e) {
+    showResponse(method, 0, Date.now()-t0, { error: e.message });
+    toast('网络错误：' + e.message, 'error');
+  } finally {
+    btn.disabled = false; sp.style.display = 'none';
+  }
+}
+
+// ── 各接口 ──
+function dirCategory() {
+  request('GET', `${BASE}/categories/dir/`, null, 'btn-dir', 'sp-dir', true);
+}
+
+function createCategory() {
+  const name   = document.getElementById('c-name').value.trim();
+  const parent = document.getElementById('c-parent').value;
+  if (!name) { toast('请填写品类名称', 'error'); return; }
+  const body = { category_name: name };
+  if (parent) body.parent = parseInt(parent);
+  request('POST', `${BASE}/categories/create/`, body, 'btn-create', 'sp-create');
+}
+
+function updateCategory() {
+  const id     = document.getElementById('u-id').value;
+  const name   = document.getElementById('u-name').value.trim();
+  const parent = document.getElementById('u-parent').value;
+  if (!id) { toast('请选择要修改的品类', 'error'); return; }
+  if (!name && parent === '') { toast('请至少填写一项修改内容', 'error'); return; }
+  const body = {};
+  if (name)           body.category_name = name;
+  if (parent === '0') body.parent = null;
+  else if (parent)    body.parent = parseInt(parent);
+  request('PATCH', `${BASE}/categories/${id}/update/`, body, 'btn-update', 'sp-update');
+}
+
+function deleteCategory() {
+  const id  = document.getElementById('d-id').value;
+  const sel = document.getElementById('d-id');
+  const name = sel.options[sel.selectedIndex]?.text || '';
+  if (!id) { toast('请选择要删除的品类', 'error'); return; }
+  if (!confirm(`确认删除「${name}」？`)) return;
+  request('DELETE', `${BASE}/categories/${id}/delete/`, null, 'btn-delete', 'sp-delete');
+}
+
+// ── 工具 ──
+function clearOutput() {
+  document.getElementById('output').innerHTML = '';
+  document.getElementById('view-tree').innerHTML = '';
+  document.getElementById('empty-state').style.display = '';
+  ['pill-method','pill-status','pill-time'].forEach(id => document.getElementById(id).style.display='none');
+  toast('已清空', 'info');
+}
+
+function copyOutput() {
+  if (!lastOutput) { toast('暂无内容可复制', 'info'); return; }
+  navigator.clipboard.writeText(lastOutput).then(() => toast('已复制到剪贴板', 'success'));
+}
+
+let toastTimer;
+function toast(msg, type='info') {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.className = `toast ${type} show`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+// ── 初始化：页面加载时自动查询一次 ──
+window.onload = () => {
+  switchView('tree');
+  dirCategory();
+};
+</script>
+</body>
+</html>
