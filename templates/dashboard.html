@@ -1,0 +1,1435 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>威格管理后台</title>
+<style>
+:root{
+  --bg:#0f1117;--bg2:#161926;--bg3:#1e2235;--bg4:#252a40;
+  --border:#252d4a;--border2:#2e3860;
+  --accent:#6c63ff;--accent2:#818cf8;
+  --green:#34d399;--orange:#fb923c;--red:#f87171;--blue:#60a5fa;
+  --yellow:#fbbf24;--purple:#c084fc;
+  --text:#e2e8f0;--text2:#94a3b8;--text3:#64748b;--text4:#3d4d6a;
+  --radius:10px;--radius-sm:7px;
+  --shadow:0 8px 32px rgba(0,0,0,.55);
+  --sidebar:260px;--drawer:500px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;background:var(--bg);color:var(--text);height:100vh;display:flex;justify-content:center;overflow:hidden;}
+.page-wrap{width:100%;max-width:1440px;display:flex;flex-direction:column;height:100vh;overflow:hidden;box-shadow:0 0 60px rgba(0,0,0,.6);}
+
+/* ── Topbar ── */
+.topbar{height:52px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;gap:12px;flex-shrink:0;}
+.logo{display:flex;align-items:center;gap:9px;}
+.logo-icon{width:28px;height:28px;background:linear-gradient(135deg,var(--accent),#9f7aea);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:14px;box-shadow:0 2px 8px rgba(108,99,255,.35);}
+.logo-name{font-size:14px;font-weight:700;color:var(--text);}
+.logo-badge{font-size:10px;padding:2px 7px;border-radius:20px;background:rgba(108,99,255,.15);color:var(--accent2);border:1px solid rgba(108,99,255,.25);}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:12px;}
+.server-badge{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text3);padding:4px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;}
+.dot-online{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 5px var(--green);}
+.user-pill{display:flex;align-items:center;gap:7px;padding:4px 10px 4px 5px;background:var(--bg3);border:1px solid var(--border);border-radius:20px;}
+.avatar{width:24px;height:24px;background:linear-gradient(135deg,var(--accent),#9f7aea);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;}
+.username{font-size:12px;color:var(--text2);}
+.btn-logout{padding:5px 12px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--text3);font-size:11px;cursor:pointer;transition:all .2s;}
+.btn-logout:hover{border-color:var(--red);color:var(--red);}
+
+/* ── Layout ── */
+.layout{display:flex;flex:1;overflow:hidden;position:relative;}
+
+/* ── Sidebar ── */
+.sidebar{width:var(--sidebar);flex-shrink:0;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;}
+.sb-hdr{padding:18px 16px 14px;border-bottom:1px solid var(--border);}
+.sb-tag{font-size:10px;font-weight:700;color:var(--text4);letter-spacing:1.2px;text-transform:uppercase;margin-bottom:3px;}
+.sb-sub{font-size:12px;color:var(--text2);}
+.sb-nav{padding:10px 0;flex:1;overflow-y:auto;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 16px;cursor:pointer;color:var(--text2);font-size:13px;border-left:3px solid transparent;transition:all .15s;position:relative;}
+.nav-item:hover{background:rgba(108,99,255,.07);color:var(--text);}
+.nav-item.active{background:rgba(108,99,255,.12);color:var(--accent2);border-left-color:var(--accent);}
+.nav-icon{font-size:16px;width:22px;text-align:center;flex-shrink:0;}
+.nav-label{flex:1;font-weight:500;}
+.nav-count{font-size:10px;padding:2px 7px;border-radius:10px;background:var(--bg4);color:var(--text3);border:1px solid var(--border);}
+.nav-item.active .nav-count{background:rgba(108,99,255,.2);color:var(--accent2);border-color:rgba(108,99,255,.3);}
+.sb-footer{border-top:1px solid var(--border);padding:8px 0;}
+
+/* ── Main ── */
+.main{flex:1;overflow:hidden;display:flex;flex-direction:column;min-width:0;}
+.mod-page{flex:1;overflow-y:auto;padding:32px 48px;display:none;}
+.mod-page.active{display:block;}
+
+/* ── Page header ── */
+.page-hdr{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px;}
+.page-title{font-size:18px;font-weight:700;color:var(--text);letter-spacing:-.3px;}
+.page-desc{font-size:12px;color:var(--text3);margin-top:4px;}
+.page-actions{display:flex;gap:8px;flex-shrink:0;}
+.btn-new{display:flex;align-items:center;gap:6px;padding:8px 18px;background:linear-gradient(135deg,var(--accent),#4f46e5);color:#fff;border:none;border-radius:var(--radius-sm);font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 2px 10px rgba(108,99,255,.28);transition:all .2s;white-space:nowrap;}
+.btn-new:hover{transform:translateY(-1px);box-shadow:0 4px 16px rgba(108,99,255,.4);}
+.btn-refresh{display:flex;align-items:center;gap:5px;padding:8px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text2);font-size:13px;cursor:pointer;transition:all .2s;white-space:nowrap;}
+.btn-refresh:hover{border-color:var(--accent);color:var(--accent2);}
+
+/* ── Filter bar ── */
+.filter-bar{display:flex;align-items:flex-end;gap:10px;padding:14px 18px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:16px;}
+.f-field{display:flex;flex-direction:column;gap:5px;}
+.f-label{font-size:11px;font-weight:600;color:var(--text2);}
+.f-select{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:13px;padding:8px 12px;outline:none;min-width:200px;font-family:inherit;transition:all .2s;}
+.f-select:focus{border-color:var(--accent);}
+.btn-query{padding:8px 18px;background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;border:none;border-radius:var(--radius-sm);font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;transition:all .2s;}
+.btn-query:hover{filter:brightness(1.1);}
+.btn-clear-filter{padding:8px 12px;background:transparent;border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text3);font-size:13px;cursor:pointer;white-space:nowrap;transition:all .2s;}
+.btn-clear-filter:hover{border-color:var(--red);color:var(--red);}
+
+/* ── Data card ── */
+.data-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
+.dc-header{padding:12px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;}
+.dc-title{font-size:13px;font-weight:600;color:var(--text);flex:1;}
+.dc-count{font-size:11px;padding:3px 10px;border-radius:20px;background:rgba(108,99,255,.1);color:var(--accent2);border:1px solid rgba(108,99,255,.2);}
+
+/* ── 品类树 ── */
+.tree-body{padding:12px 16px;}
+.tree-node{}
+.tr-row{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:7px;transition:background .12s;font-size:13px;}
+.tr-row:hover{background:rgba(108,99,255,.07);}
+.tr-row:hover .tr-actions{opacity:1;}
+.tr-toggle{width:18px;height:18px;border-radius:4px;background:var(--bg3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--text3);cursor:pointer;flex-shrink:0;transition:all .15s;}
+.tr-toggle:hover{border-color:var(--accent);}
+.tr-toggle.open{transform:rotate(90deg);}
+.tr-dot{width:18px;text-align:center;color:var(--text4);flex-shrink:0;}
+.tr-name{font-weight:500;color:var(--text);flex:1;}
+.tr-level{font-size:10px;font-weight:600;padding:2px 8px;border-radius:4px;flex-shrink:0;}
+.tr-level-0{background:rgba(108,99,255,.12);color:var(--accent2);border:1px solid rgba(108,99,255,.25);}
+.tr-level-1{background:rgba(96,165,250,.1);color:var(--blue);border:1px solid rgba(96,165,250,.2);}
+.tr-level-2{background:rgba(52,211,153,.08);color:var(--green);border:1px solid rgba(52,211,153,.2);}
+.tr-prod-badge{font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;flex-shrink:0;}
+.tr-prod-has{background:rgba(52,211,153,.15);color:var(--green);border:1px solid rgba(52,211,153,.35);}
+.tr-prod-empty{background:rgba(100,116,139,.1);color:var(--text3);border:1px solid rgba(100,116,139,.2);}
+.tr-actions{display:flex;gap:5px;opacity:0;transition:opacity .15s;flex-shrink:0;}
+.tree-children{padding-left:28px;border-left:1px dashed var(--border2);margin-left:9px;}
+.tree-children.collapsed{display:none;}
+
+/* ── 属性定义列表 ── */
+.attr-list-row{display:flex;align-items:center;gap:12px;padding:12px 18px;border-bottom:1px solid var(--border);transition:background .12s;}
+.attr-list-row:last-child{border-bottom:none;}
+.attr-list-row:hover{background:rgba(108,99,255,.04);}
+.attr-list-row:hover .tr-actions{opacity:1;}
+.al-id{font-size:11px;color:var(--text3);min-width:32px;flex-shrink:0;}
+.al-name{font-size:13px;font-weight:500;color:var(--text);flex:1;}
+.al-time{font-size:11px;color:var(--text4);min-width:90px;text-align:right;flex-shrink:0;}
+
+/* ── 商品卡片网格 ── */
+.prod-grid{padding:16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px;}
+.prod-card{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;transition:all .2s;position:relative;}
+.prod-card:hover{border-color:rgba(108,99,255,.4);transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.35);}
+.prod-card:hover .pc-actions{opacity:1;}
+.pc-thumb{height:100px;background:var(--bg4);display:flex;align-items:center;justify-content:center;font-size:32px;opacity:.2;overflow:hidden;}
+.pc-thumb img{width:100%;height:100%;object-fit:cover;opacity:1;}
+.pc-body{padding:10px 12px;}
+.pc-name{font-size:13px;font-weight:600;color:var(--text);margin-bottom:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.pc-price{font-size:14px;font-weight:700;color:var(--orange);margin-bottom:5px;}
+.pc-meta{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
+.stock-chip{font-size:10px;padding:2px 7px;border-radius:3px;}
+.stock-ok{background:rgba(52,211,153,.1);color:var(--green);border:1px solid rgba(52,211,153,.25);}
+.stock-low{background:rgba(248,113,113,.1);color:var(--red);border:1px solid rgba(248,113,113,.25);}
+.stock-zero{background:rgba(100,116,139,.1);color:var(--text3);border:1px solid var(--border);}
+.pc-cat{font-size:11px;color:var(--text3);}
+.pc-actions{position:absolute;top:8px;right:8px;display:flex;gap:4px;opacity:0;transition:opacity .2s;}
+
+/* ── 属性值表格 ── */
+.val-table{width:100%;border-collapse:collapse;}
+.val-th{text-align:left;padding:10px 18px;font-size:11px;font-weight:700;color:var(--text3);letter-spacing:.8px;text-transform:uppercase;border-bottom:1px solid var(--border);background:var(--bg3);}
+.val-td{padding:11px 18px;font-size:13px;color:var(--text2);border-bottom:1px solid var(--border);}
+.val-tr:last-child .val-td{border-bottom:none;}
+.val-tr:hover .val-td{background:rgba(108,99,255,.04);}
+.val-tr:hover .tr-actions{opacity:1;}
+.val-mono{font-family:'Cascadia Code','Fira Code',monospace;color:var(--yellow);font-size:12px;}
+.val-null{color:var(--text3);font-style:italic;font-size:12px;}
+
+/* ── 行内操作按钮 ── */
+.btn-row-edit{padding:4px 10px;background:rgba(251,146,60,.1);border:1px solid rgba(251,146,60,.25);border-radius:4px;color:var(--orange);font-size:11px;cursor:pointer;transition:all .15s;}
+.btn-row-edit:hover{background:rgba(251,146,60,.2);}
+.btn-row-del{padding:4px 10px;background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.2);border-radius:4px;color:var(--red);font-size:11px;cursor:pointer;transition:all .15s;}
+.btn-row-del:hover{background:rgba(248,113,113,.18);}
+.btn-row-fill{padding:4px 10px;background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.2);border-radius:4px;color:var(--green);font-size:11px;cursor:pointer;transition:all .15s;}
+.btn-row-fill:hover{background:rgba(52,211,153,.18);}
+.btn-row-attrs{padding:4px 10px;background:rgba(129,140,248,.1);border:1px solid rgba(129,140,248,.25);border-radius:4px;color:var(--accent2);font-size:11px;cursor:pointer;transition:all .15s;}
+.btn-row-attrs:hover{background:rgba(129,140,248,.2);}
+.val-empty{color:var(--text4);font-style:italic;font-size:12px;}
+.drawer.wide{width:620px;}
+.attr-slot-table{width:100%;border-collapse:collapse;}
+.attr-slot-tr:hover .attr-slot-td{background:rgba(108,99,255,.04);}
+.attr-slot-td{padding:10px 12px;font-size:13px;color:var(--text2);border-bottom:1px solid var(--border);}
+.attr-slot-tr:last-child .attr-slot-td{border-bottom:none;}
+.slot-name{font-weight:500;color:var(--text);}
+.attr-back-btn{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--accent2);cursor:pointer;margin-bottom:16px;width:fit-content;}
+.attr-back-btn:hover{text-decoration:underline;}
+
+/* ── 类型标签 ── */
+.type-badge{font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px;}
+.type-str{background:rgba(96,165,250,.12);color:var(--blue);}
+.type-int{background:rgba(251,146,60,.12);color:var(--orange);}
+.type-float{background:rgba(192,132,252,.12);color:var(--purple);}
+.type-bool{background:rgba(52,211,153,.12);color:var(--green);}
+.req-badge{font-size:10px;padding:3px 8px;border-radius:4px;}
+.req-yes{background:rgba(248,113,113,.1);color:var(--red);}
+.req-no{background:var(--bg3);color:var(--text3);}
+
+/* ── Empty state ── */
+.empty-state{padding:60px 20px;text-align:center;color:var(--text3);}
+.empty-icon{font-size:40px;margin-bottom:12px;opacity:.3;}
+.empty-text{font-size:13px;line-height:1.6;}
+
+/* ══════════════════════════
+   右侧抽屉 Drawer
+══════════════════════════ */
+.drawer-overlay{position:absolute;inset:0;background:rgba(0,0,0,.55);z-index:100;opacity:0;pointer-events:none;transition:opacity .25s;backdrop-filter:blur(2px);}
+.drawer-overlay.open{opacity:1;pointer-events:all;}
+.drawer{position:absolute;top:0;right:0;bottom:0;width:var(--drawer);background:var(--bg2);border-left:1px solid var(--border);display:flex;flex-direction:column;z-index:101;transform:translateX(100%);transition:transform .28s cubic-bezier(.25,.46,.45,.94);}
+.drawer.open{transform:translateX(0);}
+.drawer-hdr{padding:20px 24px 16px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;flex-shrink:0;}
+.d-title{font-size:16px;font-weight:700;color:var(--text);}
+.d-subtitle{font-size:11px;color:var(--text3);margin-top:3px;}
+.drawer-close{width:28px;height:28px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer;color:var(--text3);transition:all .15s;flex-shrink:0;}
+.drawer-close:hover{border-color:var(--red);color:var(--red);}
+.drawer-body{flex:1;overflow-y:auto;padding:24px;}
+.drawer-footer{padding:14px 24px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end;flex-shrink:0;background:var(--bg3);}
+
+/* ── Drawer 按钮 ── */
+.d-btn-save{padding:9px 24px;background:linear-gradient(135deg,var(--accent),#4f46e5);color:#fff;border:none;border-radius:var(--radius-sm);font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:7px;transition:all .2s;}
+.d-btn-save:hover{filter:brightness(1.1);}
+.d-btn-save:disabled{opacity:.6;cursor:not-allowed;}
+.d-btn-save.danger{background:linear-gradient(135deg,var(--red),#dc2626);}
+.d-btn-cancel{padding:9px 18px;background:transparent;border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text2);font-size:13px;cursor:pointer;transition:all .2s;}
+.d-btn-cancel:hover{border-color:var(--accent);color:var(--accent2);}
+
+/* ── Drawer 表单字段 ── */
+.d-field{display:flex;flex-direction:column;gap:6px;margin-bottom:18px;}
+.d-field:last-child{margin-bottom:0;}
+.d-label{font-size:12px;font-weight:600;color:var(--text2);display:flex;align-items:center;gap:5px;}
+.d-req{color:var(--red);}
+.d-hint{font-size:11px;color:var(--text3);margin-top:1px;}
+.d-input,.d-select{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:13px;padding:10px 14px;outline:none;transition:all .2s;font-family:inherit;width:100%;}
+.d-input:focus,.d-select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(108,99,255,.1);}
+.d-input::placeholder{color:var(--text4);}
+.d-input:disabled,.d-select:disabled{opacity:.45;cursor:not-allowed;}
+.d-field-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.d-section{font-size:10px;font-weight:700;color:var(--text3);letter-spacing:1px;text-transform:uppercase;padding-bottom:6px;border-bottom:1px solid var(--border);margin-bottom:14px;margin-top:4px;}
+.d-info{padding:10px 14px;background:rgba(96,165,250,.06);border:1px solid rgba(96,165,250,.18);border-radius:8px;font-size:12px;color:var(--text2);line-height:1.6;}
+.d-warn{padding:10px 14px;background:rgba(248,113,113,.06);border:1px solid rgba(248,113,113,.2);border-radius:8px;font-size:12px;color:var(--text2);line-height:1.6;}
+
+/* ── Toggle switch ── */
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);}
+.toggle-label{font-size:13px;color:var(--text2);}
+.toggle-wrap{display:flex;align-items:center;gap:8px;}
+.toggle-status{font-size:11px;color:var(--text3);min-width:22px;text-align:right;transition:color .2s;}
+.toggle{position:relative;width:36px;height:20px;cursor:pointer;flex-shrink:0;}
+.toggle input{opacity:0;width:0;height:0;position:absolute;}
+.toggle-track{position:absolute;inset:0;background:var(--border2);border-radius:20px;transition:background .2s;}
+.toggle input:checked+.toggle-track{background:var(--green);}
+.toggle-thumb{position:absolute;width:14px;height:14px;background:#fff;border-radius:50%;top:3px;left:3px;transition:transform .2s;box-shadow:0 1px 4px rgba(0,0,0,.3);}
+.toggle input:checked~.toggle-thumb{transform:translateX(16px);}
+
+/* ── 图片上传 ── */
+.img-upload{border:2px dashed var(--border);border-radius:var(--radius-sm);padding:18px;text-align:center;cursor:pointer;background:var(--bg3);transition:all .2s;position:relative;}
+.img-upload:hover{border-color:var(--accent);background:rgba(108,99,255,.04);}
+.img-upload.has-img{border-style:solid;border-color:rgba(108,99,255,.35);padding:6px;}
+.img-ph{color:var(--text3);pointer-events:none;}
+.img-ph-icon{font-size:24px;margin-bottom:5px;opacity:.35;}
+.img-ph-text{font-size:12px;}
+.img-preview{width:100%;max-height:130px;object-fit:contain;border-radius:5px;display:none;}
+.img-clear-btn{margin-top:5px;font-size:11px;color:var(--red);cursor:pointer;display:none;}
+.img-clear-btn:hover{text-decoration:underline;}
+
+/* ── 属性值输入盒 ── */
+.val-input-box{border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;background:var(--bg3);display:none;flex-direction:column;gap:9px;}
+.val-input-box.visible{display:flex;}
+.val-type-label{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text2);}
+.val-req-tag{font-size:10px;padding:2px 6px;border-radius:3px;background:rgba(248,113,113,.12);color:var(--red);border:1px solid rgba(248,113,113,.25);}
+
+/* ── Spinner ── */
+.spinner{width:13px;height:13px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;display:none;}
+.spinner-sm{width:9px;height:9px;border:2px solid rgba(130,140,248,.3);border-top-color:var(--accent2);border-radius:50%;animation:spin .6s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* ── Toast ── */
+.toast{position:fixed;bottom:22px;right:22px;padding:9px 18px;border-radius:var(--radius-sm);font-size:13px;color:#fff;box-shadow:var(--shadow);transform:translateY(14px);opacity:0;transition:all .3s;z-index:9999;pointer-events:none;max-width:320px;}
+.toast.show{transform:translateY(0);opacity:1;}
+.toast.success{background:#059669;}
+.toast.error{background:#dc2626;}
+.toast.info{background:#2563eb;}
+
+::-webkit-scrollbar{width:4px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
+</style>
+</head>
+<body>
+<div class="page-wrap">
+
+<!-- ── Topbar ── -->
+<div class="topbar">
+  <div class="logo">
+    <div class="logo-icon">🏷</div>
+    <span class="logo-name">威格管理后台</span>
+    <span class="logo-badge">ADMIN</span>
+  </div>
+  <div class="topbar-right">
+    <div class="server-badge"><div class="dot-online"></div><span>127.0.0.1:8000</span></div>
+    <div class="user-pill">
+      <div class="avatar" id="user-avatar">管</div>
+      <span class="username" id="username-display">—</span>
+    </div>
+    <button class="btn-logout" onclick="logout()">退出登录</button>
+  </div>
+</div>
+
+<div class="layout">
+
+  <!-- ── Sidebar ── -->
+  <div class="sidebar">
+    <div class="sb-hdr">
+      <div class="sb-tag">数据管理</div>
+      <div class="sb-sub">商品管理系统</div>
+    </div>
+    <div class="sb-nav">
+      <div class="nav-item" id="nav-cat" onclick="switchModule('cat')">
+        <span class="nav-icon">🗂</span><span class="nav-label">品类管理</span>
+        <span class="nav-count" id="nc-cat">—</span>
+      </div>
+      <div class="nav-item" id="nav-ad" onclick="switchModule('ad')">
+        <span class="nav-icon">🏷</span><span class="nav-label">属性定义</span>
+        <span class="nav-count" id="nc-ad">—</span>
+      </div>
+      <div class="nav-item" id="nav-prod" onclick="switchModule('prod')">
+        <span class="nav-icon">📦</span><span class="nav-label">商品管理</span>
+        <span class="nav-count" id="nc-prod">—</span>
+      </div>
+    </div>
+    <div class="sb-footer">
+      <div class="nav-item" style="color:var(--text3);font-size:12px;">
+        <span class="nav-icon">⚙</span><span class="nav-label">系统设置</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Main ── -->
+  <div class="main">
+
+    <!-- 品类管理 -->
+    <div id="mod-cat" class="mod-page">
+      <div class="page-hdr">
+        <div>
+          <div class="page-title">🗂 品类管理</div>
+          <div class="page-desc">管理商品品类的层级结构，支持多级树形分类</div>
+        </div>
+        <div class="page-actions">
+          <button class="btn-refresh" onclick="catLoad()">⟳ 刷新</button>
+          <button class="btn-new" onclick="openDrawer('cat-create')">＋ 新增品类</button>
+        </div>
+      </div>
+      <div id="cat-data"></div>
+    </div>
+
+    <!-- 属性定义 -->
+    <div id="mod-ad" class="mod-page">
+      <div class="page-hdr">
+        <div>
+          <div class="page-title">🏷 属性定义</div>
+          <div class="page-desc">管理各品类的动态属性，决定商品拥有哪些可填字段</div>
+        </div>
+        <div class="page-actions">
+          <button class="btn-new" onclick="openDrawer('ad-create')">＋ 新增属性定义</button>
+        </div>
+      </div>
+      <div class="filter-bar">
+        <div class="f-field">
+          <span class="f-label">按品类查询 <span style="color:var(--red)">*</span></span>
+          <select class="f-select" id="ad-filter-cat">
+            <option value="">— 请选择品类 —</option>
+          </select>
+        </div>
+        <button class="btn-query" onclick="adLoad()">🔍 查询</button>
+      </div>
+      <div id="ad-data"></div>
+    </div>
+
+    <!-- 商品管理 -->
+    <div id="mod-prod" class="mod-page">
+      <div class="page-hdr">
+        <div>
+          <div class="page-title">📦 商品管理</div>
+          <div class="page-desc">查询和管理所有商品，支持按品类筛选</div>
+        </div>
+        <div class="page-actions">
+          <button class="btn-refresh" onclick="prodLoad()">⟳ 刷新</button>
+          <button class="btn-new" onclick="openDrawer('prod-create')">＋ 新增商品</button>
+        </div>
+      </div>
+      <div class="filter-bar">
+        <div class="f-field">
+          <span class="f-label">按品类筛选</span>
+          <select class="f-select" id="prod-filter-cat">
+            <option value="">— 全部品类 —</option>
+          </select>
+        </div>
+        <button class="btn-query" onclick="prodLoad()">🔍 查询</button>
+        <button class="btn-clear-filter" onclick="document.getElementById('prod-filter-cat').value='';prodLoad()">清除</button>
+      </div>
+      <div id="prod-data"></div>
+    </div>
+
+
+    <!-- 抽屉遮罩 -->
+    <div class="drawer-overlay" id="drawer-overlay" onclick="closeDrawer()"></div>
+
+    <!-- 抽屉 -->
+    <div class="drawer" id="drawer">
+      <div class="drawer-hdr">
+        <div>
+          <div class="d-title" id="d-title">—</div>
+          <div class="d-subtitle" id="d-subtitle">—</div>
+        </div>
+        <div class="drawer-close" onclick="closeDrawer()">✕</div>
+      </div>
+      <div class="drawer-body" id="d-body"></div>
+      <div class="drawer-footer">
+        <button class="d-btn-cancel" onclick="closeDrawer()">取消</button>
+        <button class="d-btn-save" id="d-save-btn" onclick="drawerSave()">
+          <span class="spinner" id="d-spinner"></span>
+          <span id="d-save-text">保存</span>
+        </button>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /layout -->
+
+</div><!-- /page-wrap -->
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════
+// 全局状态
+// ══════════════════════════════════════════════
+const BASE = '/api';
+let currentModule = 'cat';
+let drawerMode = null;   // 'cat-create'|'cat-edit'|'ad-create'|'ad-edit'|'prod-create'|'prod-edit'|'val-create'|'val-edit'|'cat-delete'
+let editingId   = null;  // 当前编辑/删除的记录 ID
+let currentAdCatId     = null;   // 属性定义模块当前选中的品类
+let currentValProdId   = null;   // 属性值模块当前选中的商品
+let currentProdCatFilter = null; // 商品模块当前筛选品类
+
+let allCategories = [];
+let allProducts   = [];
+const catMap      = {};  // id → category_name
+const productMap  = {};  // id → { product_name, category_id }
+const adAttrDefCache  = {};  // catId → [attrDef]
+const adAttrDefMap    = {};  // attrDefId → { attr_name, value_type, is_required }
+const valAttrValuesCache = {}; // productId → [attrValue]
+
+// ══════════════════════════════════════════════
+// 认证
+// ══════════════════════════════════════════════
+function getToken()    { return localStorage.getItem('wg_token') || ''; }
+function getUsername() {
+  try { return JSON.parse(localStorage.getItem('wg_user'))?.phone || localStorage.getItem('wg_username') || '管理员'; }
+  catch { return localStorage.getItem('wg_username') || '管理员'; }
+}
+function checkAuth() {
+  const token = getToken();
+  if (!token || token === 'undefined' || token === 'null' || token.length < 20) {
+    localStorage.removeItem('wg_token');
+    localStorage.removeItem('wg_user');
+    window.location.href = '/login/';
+    return false;
+  }
+  return true;
+}
+function logout() {
+  localStorage.removeItem('wg_token');
+  localStorage.removeItem('wg_username');
+  localStorage.removeItem('wg_user');
+  window.location.href = '/login/';
+}
+function authHeaders(isJson = true) {
+  const h = { 'Authorization': `Bearer ${getToken()}` };
+  if (isJson) h['Content-Type'] = 'application/json';
+  return h;
+}
+
+// ══════════════════════════════════════════════
+// 通用请求助手（去掉响应面板，改为 toast）
+// ══════════════════════════════════════════════
+async function apiReq(method, url, body = null) {
+  try {
+    const opts = { method, headers: authHeaders() };
+    if (body) opts.body = JSON.stringify(body);
+    const res = await fetch(url, opts);
+    if (res.status === 401) { _handleUnauthorized(); return { ok: false }; }
+    const data = await res.json();
+    if (!res.ok) {
+      const errMsg = data.message || (typeof data.data === 'object' ? JSON.stringify(data.data) : '请求失败');
+      toast(errMsg, 'error');
+    }
+    return { ok: res.ok, data };
+  } catch(e) { toast('网络错误：' + e.message, 'error'); return { ok: false }; }
+}
+async function apiMultipart(method, url, fd) {
+  try {
+    const res = await fetch(url, { method, body: fd, headers: { 'Authorization': `Bearer ${getToken()}` } });
+    if (res.status === 401) { _handleUnauthorized(); return { ok: false }; }
+    const data = await res.json();
+    if (!res.ok) toast(data.message || '请求失败', 'error');
+    return { ok: res.ok, data };
+  } catch(e) { toast('网络错误：' + e.message, 'error'); return { ok: false }; }
+}
+function _handleUnauthorized() {
+  toast('登录已过期，即将跳转登录页…', 'error');
+  setTimeout(() => {
+    localStorage.removeItem('wg_token');
+    localStorage.removeItem('wg_user');
+    window.location.href = '/login/';
+  }, 1500);
+}
+
+// ══════════════════════════════════════════════
+// 模块导航
+// ══════════════════════════════════════════════
+function switchModule(mod) {
+  currentModule = mod;
+  document.querySelectorAll('.mod-page').forEach(p => p.classList.remove('active'));
+  document.getElementById(`mod-${mod}`).classList.add('active');
+  document.querySelectorAll('.nav-item[id^="nav-"]').forEach(n => n.classList.remove('active'));
+  document.getElementById(`nav-${mod}`).classList.add('active');
+  closeDrawer();
+  if (mod === 'cat')  catLoad();
+  if (mod === 'prod') { prodLoad(); }
+}
+
+// ══════════════════════════════════════════════
+// 抽屉控制
+// ══════════════════════════════════════════════
+function openDrawer(mode, data = {}) {
+  drawerMode = mode;
+  editingId  = data.id || null;
+  const overlay = document.getElementById('drawer-overlay');
+  const drawer  = document.getElementById('drawer');
+  const saveBtn = document.getElementById('d-save-btn');
+  overlay.classList.add('open');
+  drawer.classList.add('open');
+  saveBtn.classList.remove('danger');
+  drawer.classList.toggle('wide', mode === 'prod-attrs');
+  // 根据 mode 渲染抽屉内容
+  switch(mode) {
+    case 'cat-create': _drawerCatCreate(); break;
+    case 'cat-edit':   _drawerCatEdit(data); break;
+    case 'cat-delete': _drawerCatDelete(data); break;
+    case 'ad-create':  _drawerAdCreate(); break;
+    case 'ad-edit':    _drawerAdEdit(data); break;
+    case 'ad-delete':  _drawerAdDelete(data); break;
+    case 'prod-create': _drawerProdCreate(); break;
+    case 'prod-edit':   _drawerProdEdit(data); break;
+    case 'prod-delete': _drawerProdDelete(data); break;
+    case 'prod-attrs':  _drawerProdAttrs(data); break;
+    case 'val-create':  _drawerValCreate(data); break;
+    case 'val-edit':    _drawerValEdit(data); break;
+  }
+}
+function closeDrawer() {
+  document.getElementById('drawer-overlay').classList.remove('open');
+  const drawer = document.getElementById('drawer');
+  drawer.classList.remove('open', 'wide');
+  document.getElementById('d-save-btn').style.display = '';
+  drawerMode = null; editingId = null;
+}
+async function drawerSave() {
+  const btn = document.getElementById('d-save-btn');
+  const sp  = document.getElementById('d-spinner');
+  btn.disabled = true; sp.style.display = 'inline-block';
+  try {
+    switch(drawerMode) {
+      case 'cat-create':  await _saveCatCreate(); break;
+      case 'cat-edit':    await _saveCatEdit(); break;
+      case 'cat-delete':  await _saveCatDelete(); break;
+      case 'ad-create':   await _saveAdCreate(); break;
+      case 'ad-edit':     await _saveAdEdit(); break;
+      case 'ad-delete':   await _saveAdDelete(); break;
+      case 'prod-create': await _saveProdCreate(); break;
+      case 'prod-edit':   await _saveProdEdit(); break;
+      case 'prod-delete': await _saveProdDelete(); break;
+      case 'prod-attrs':  closeDrawer(); break;
+      case 'val-create':  await _saveValCreate(); break;
+      case 'val-edit':    await _saveValEdit(); break;
+    }
+  } finally { btn.disabled = false; sp.style.display = 'none'; }
+}
+function _setDrawerHeader(title, subtitle, saveText, danger = false) {
+  document.getElementById('d-title').textContent = title;
+  document.getElementById('d-subtitle').textContent = subtitle;
+  document.getElementById('d-save-text').textContent = saveText;
+  document.getElementById('d-save-btn').classList.toggle('danger', danger);
+}
+
+// ══════════════════════════════════════════════
+// 工具函数
+// ══════════════════════════════════════════════
+function getLeafCategories() {
+  const parentIds = new Set(allCategories.map(c => c.parent_id).filter(id => id != null));
+  return allCategories.filter(c => !parentIds.has(c.id));
+}
+function catLabel(c) { return c.parent_name ? `${c.parent_name} / ${c.category_name}` : c.category_name; }
+function _populateSelect(selId, list, ph, valFn, labelFn, cur = '') {
+  const sel = document.getElementById(selId); if (!sel) return;
+  sel.innerHTML = `<option value="">${ph}</option>`;
+  list.forEach(item => { sel.innerHTML += `<option value="${valFn(item)}">${labelFn(item)}</option>`; });
+  if (cur) sel.value = cur;
+}
+const TYPE_LABELS = { str:'str · 文本', int:'int · 整数', float:'float · 小数', bool:'bool · 布尔' };
+const TYPE_CLASS  = { str:'type-str', int:'type-int', float:'type-float', bool:'type-bool' };
+
+// ══════════════════════════════════════════════
+// 品类模块
+// ══════════════════════════════════════════════
+async function catLoad() {
+  const area = document.getElementById('cat-data');
+  area.innerHTML = '<div class="empty-state"><div class="empty-icon">⏳</div><div class="empty-text">加载中...</div></div>';
+  const r = await apiReq('GET', `${BASE}/categories/dir/`);
+  if (!r.ok || !r.data.success) { area.innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-text">加载失败，请刷新重试</div></div>'; return; }
+  allCategories = r.data.data || [];
+  allCategories.forEach(c => { catMap[c.id] = c.category_name; });
+  document.getElementById('nc-cat').textContent = allCategories.length;
+  // 同步更新品类下拉（属性定义/商品模块）
+  _refreshCatSelects();
+  catRenderModule();
+}
+function catBuildTree(list) {
+  const map = {}, roots = [];
+  list.forEach(c => map[c.id] = { ...c, children: [] });
+  list.forEach(c => { if (c.parent_id && map[c.parent_id]) map[c.parent_id].children.push(map[c.id]); else roots.push(map[c.id]); });
+  return roots;
+}
+function catRenderModule() {
+  const area = document.getElementById('cat-data');
+  if (!allCategories.length) {
+    area.innerHTML = `<div class="empty-state"><div class="empty-icon">🗂</div><div class="empty-text">暂无品类数据<br>点击右上角「＋ 新增品类」创建第一个品类</div></div>`;
+    return;
+  }
+  const roots = catBuildTree(allCategories);
+  area.innerHTML = `<div class="data-card"><div class="dc-header"><span class="dc-title">品类树形结构</span><span class="dc-count">${allCategories.length} 个品类</span></div><div class="tree-body" id="cat-tree">${_catRenderNodes(roots, 0)}</div></div>`;
+}
+function _catRenderNodes(nodes, depth) {
+  const levelText = ['0级','1级','2级','3级'];
+  const lvClass   = ['tr-level-0','tr-level-1','tr-level-2','tr-level-2'];
+  return nodes.map(n => {
+    const has = n.children.length > 0, nid = `tn-${n.id}`;
+    const lv = Math.min(depth, 3);
+    const actions = `<div class="tr-actions"><button class="btn-row-edit" onclick="catOpenEdit(${n.id})">编辑</button><button class="btn-row-del" onclick="catOpenDelete(${n.id},'${n.category_name.replace(/'/g,"\\'")}')">删除</button></div>`;
+    const toggle = has
+      ? `<span class="tr-toggle open" id="tg-${n.id}" onclick="catToggleNode('${nid}',this)">▶</span>`
+      : `<span class="tr-dot">·</span>`;
+    const prodBadge = !has
+      ? (n.product_count > 0
+          ? `<span class="tr-prod-badge tr-prod-has">📦 ${n.product_count} 件</span>`
+          : `<span class="tr-prod-badge tr-prod-empty">空</span>`)
+      : '';
+    const row = `<div class="tr-row">${toggle}<span class="tr-name">${n.category_name}</span>${prodBadge}<span class="tr-level ${lvClass[lv]}">${levelText[lv]}</span>${actions}</div>`;
+    const children = has ? `<div class="tree-children" id="${nid}">${_catRenderNodes(n.children, depth + 1)}</div>` : '';
+    return `<div class="tree-node">${row}${children}</div>`;
+  }).join('');
+}
+function catToggleNode(nid, toggleEl) {
+  const el = document.getElementById(nid); if (!el) return;
+  const collapsed = el.classList.toggle('collapsed');
+  toggleEl.classList.toggle('open', !collapsed);
+}
+function catOpenEdit(id) {
+  const cat = allCategories.find(c => c.id === id); if (!cat) return;
+  openDrawer('cat-edit', cat);
+}
+function catOpenDelete(id, name) { openDrawer('cat-delete', { id, category_name: name }); }
+
+// --- 品类 抽屉内容 ---
+function _drawerCatCreate() {
+  _setDrawerHeader('新增品类', '填写信息后点击「创建品类」', '创建品类');
+  document.getElementById('d-body').innerHTML = `
+    <div class="d-field">
+      <label class="d-label">品类名称 <span class="d-req">*</span></label>
+      <input id="dc-name" class="d-input" type="text" placeholder="例：大衣">
+      <span class="d-hint">品类名称全局唯一，不可与已有品类重名</span>
+    </div>
+    <div class="d-field">
+      <label class="d-label">父级品类</label>
+      <select id="dc-parent" class="d-select"><option value="">— 设为顶级品类 —</option></select>
+      <span class="d-hint">留空则创建为顶级品类</span>
+    </div>`;
+  _populateSelect('dc-parent', allCategories, '— 设为顶级品类 —', c => c.id, catLabel);
+}
+function _drawerCatEdit(data) {
+  _setDrawerHeader(`编辑品类 · ${data.category_name}`, '修改后点击「保存修改」生效', '保存修改');
+  document.getElementById('d-body').innerHTML = `
+    <div class="d-field">
+      <label class="d-label">品类名称</label>
+      <input id="dc-name" class="d-input" type="text" value="${data.category_name || ''}">
+    </div>
+    <div class="d-field">
+      <label class="d-label">父级品类</label>
+      <select id="dc-parent" class="d-select"><option value="">— 顶级品类（无父级）—</option><option value="__top__">🔝 提升为顶级品类</option></select>
+      <span class="d-hint">选择「提升为顶级品类」可移除父级关联</span>
+    </div>
+    <div class="d-info">ℹ️ 修改父级品类会影响树形结构，子品类层级随之变化。</div>`;
+  const others = allCategories.filter(c => c.id !== data.id);
+  _populateSelect('dc-parent', others, '— 不修改父级 —', c => c.id, catLabel, data.parent_id || '');
+}
+function _drawerCatDelete(data) {
+  _setDrawerHeader(`删除品类 · ${data.category_name}`, '此操作不可恢复，请谨慎确认', '确认删除', true);
+  document.getElementById('d-body').innerHTML = `
+    <div class="d-warn">⚠️ 即将逻辑删除品类「<strong>${data.category_name}</strong>」（ID: ${data.id}）。<br><br>
+    删除后：品类从列表中隐藏，名称可被复用。<br>
+    其直接子品类将自动上移一级（挂到被删品类的父级下）。<br><br>
+    若该品类下仍有商品，则删除会被系统阻止。</div>`;
+}
+
+// --- 品类 保存 ---
+async function _saveCatCreate() {
+  const name = document.getElementById('dc-name').value.trim();
+  const parent = document.getElementById('dc-parent').value;
+  if (!name) { toast('请填写品类名称', 'error'); return; }
+  const body = { category_name: name };
+  if (parent) body.parent = parseInt(parent);
+  const r = await apiReq('POST', `${BASE}/categories/create/`, body);
+  if (r.ok) { toast(r.data.message || '创建成功', 'success'); closeDrawer(); catLoad(); }
+}
+async function _saveCatEdit() {
+  const name = document.getElementById('dc-name').value.trim();
+  const parent = document.getElementById('dc-parent').value;
+  if (!name && parent === '') { toast('请至少填写一项修改内容', 'error'); return; }
+  const body = {};
+  if (name) body.category_name = name;
+  if (parent === '__top__') body.parent = null;
+  else if (parent) body.parent = parseInt(parent);
+  const r = await apiReq('PATCH', `${BASE}/categories/${editingId}/update/`, body);
+  if (r.ok) { toast(r.data.message || '修改成功', 'success'); closeDrawer(); catLoad(); }
+}
+async function _saveCatDelete() {
+  const r = await apiReq('DELETE', `${BASE}/categories/${editingId}/delete/`);
+  if (r.ok) { toast(r.data.message || '删除成功', 'success'); closeDrawer(); catLoad(); }
+}
+
+// ══════════════════════════════════════════════
+// 属性定义模块
+// ══════════════════════════════════════════════
+function _refreshCatSelects() {
+  const leaves = getLeafCategories();
+  _populateSelect('ad-filter-cat',  leaves, '— 请选择末级品类 —', c => c.id, catLabel, currentAdCatId || '');
+  _populateSelect('prod-filter-cat', allCategories, '— 全部品类 —',     c => c.id, catLabel, currentProdCatFilter || '');
+  // 抽屉内的品类选择（如果已打开）
+  if (document.getElementById('dc-c-category')) _populateSelect('dc-c-category', leaves, '— 请选择末级品类 —', c => c.id, catLabel);
+  if (document.getElementById('dc-p-category')) _populateSelect('dc-p-category', leaves, '— 请选择末级品类 —', c => c.id, catLabel);
+}
+async function adLoad() {
+  const catId = document.getElementById('ad-filter-cat').value;
+  if (!catId) { toast('请先选择品类', 'error'); return; }
+  currentAdCatId = catId;
+  const area = document.getElementById('ad-data');
+  area.innerHTML = '<div class="empty-state"><div class="empty-icon">⏳</div><div class="empty-text">加载中...</div></div>';
+  delete adAttrDefCache[catId];
+  const r = await apiReq('GET', `${BASE}/attr-defs/dir/?category_id=${catId}`);
+  if (!r.ok || !r.data.success) { area.innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-text">加载失败</div></div>'; return; }
+  const list = r.data.data || [];
+  adAttrDefCache[catId] = list;
+  list.forEach(a => { adAttrDefMap[a.id] = { attr_name: a.attr_name, value_type: a.value_type, is_required: a.is_required }; });
+  document.getElementById('nc-ad').textContent = list.length;
+  adRenderModule(list, catId);
+}
+function adRenderModule(list, catId) {
+  const area = document.getElementById('ad-data');
+  const catName = allCategories.find(c => c.id == catId)?.category_name || `ID ${catId}`;
+  if (!list.length) {
+    area.innerHTML = `<div class="empty-state"><div class="empty-icon">🏷</div><div class="empty-text">「${catName}」暂无属性定义<br>点击右上角「＋ 新增属性定义」添加</div></div>`;
+    return;
+  }
+  let rows = list.map(a => {
+    const date = a.create_time ? a.create_time.replace('T',' ').substring(0,16) : '';
+    const actions = `<div class="tr-actions"><button class="btn-row-edit" onclick="adOpenEdit(${a.id})">编辑</button><button class="btn-row-del" onclick="adOpenDelete(${a.id},'${a.attr_name.replace(/'/g,"\\'")}')">删除</button></div>`;
+    return `<div class="attr-list-row">
+      <span class="al-id">#${a.id}</span>
+      <span class="al-name">${a.attr_name}</span>
+      <span class="type-badge ${TYPE_CLASS[a.value_type]||''}">${TYPE_LABELS[a.value_type]||a.value_type}</span>
+      <span class="req-badge ${a.is_required?'req-yes':'req-no'}">${a.is_required?'必填':'选填'}</span>
+      <span class="al-time">${date}</span>
+      ${actions}
+    </div>`;
+  }).join('');
+  area.innerHTML = `<div class="data-card"><div class="dc-header"><span class="dc-title">「${catName}」· 属性定义列表</span><span class="dc-count">${list.length} 条属性</span></div>${rows}</div>`;
+}
+function adOpenEdit(id) {
+  const def = adAttrDefMap[id]; if (!def) return;
+  openDrawer('ad-edit', { id, ...def });
+}
+function adOpenDelete(id, name) { openDrawer('ad-delete', { id, attr_name: name }); }
+
+// --- 属性定义 抽屉 ---
+function _drawerAdCreate() {
+  _setDrawerHeader('新增属性定义', '填写信息后点击「创建属性定义」', '创建属性定义');
+  const leaves = getLeafCategories();
+  document.getElementById('d-body').innerHTML = `
+    <div class="d-field">
+      <label class="d-label">所属品类（末级）<span class="d-req">*</span></label>
+      <select id="dc-c-category" class="d-select"><option value="">— 请选择末级品类 —</option></select>
+    </div>
+    <div class="d-field">
+      <label class="d-label">属性名称 <span class="d-req">*</span></label>
+      <input id="dc-c-attr-name" class="d-input" type="text" placeholder="例：颜色、袖长、材质">
+    </div>
+    <div class="d-field">
+      <label class="d-label">属性值类型 <span class="d-req">*</span></label>
+      <select id="dc-c-value-type" class="d-select">
+        <option value="str">str · 文本</option>
+        <option value="int">int · 整数</option>
+        <option value="float">float · 小数</option>
+        <option value="bool">bool · 布尔值</option>
+      </select>
+      <span class="d-hint">⚠️ 创建后不可修改，请谨慎选择</span>
+    </div>
+    <div class="d-field">
+      <label class="d-label">是否必填</label>
+      <div class="toggle-row">
+        <span class="toggle-label">该属性是否为商品必填项</span>
+        <div class="toggle-wrap">
+          <span class="toggle-status" id="dc-c-req-st">否</span>
+          <label class="toggle"><input type="checkbox" id="dc-c-is-required" onchange="_updToggle('dc-c-is-required','dc-c-req-st')"><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+        </div>
+      </div>
+    </div>`;
+  _populateSelect('dc-c-category', leaves, '— 请选择末级品类 —', c => c.id, catLabel, currentAdCatId || '');
+}
+function _drawerAdEdit(data) {
+  _setDrawerHeader(`编辑属性定义 · ${data.attr_name}`, '仅可修改名称与是否必填', '保存修改');
+  document.getElementById('d-body').innerHTML = `
+    <div class="d-info">ℹ️ 仅可修改属性名称与是否必填；类型与品类一经创建不可变更。</div>
+    <div class="d-field" style="margin-top:16px;">
+      <label class="d-label">属性名称</label>
+      <input id="dc-u-attr-name" class="d-input" type="text" value="${data.attr_name||''}">
+      <span class="d-hint">留空则不修改名称</span>
+    </div>
+    <div class="d-field">
+      <label class="d-label">是否必填</label>
+      <div class="toggle-row">
+        <span class="toggle-label">该属性是否为商品必填项</span>
+        <div class="toggle-wrap">
+          <span class="toggle-status" id="dc-u-req-st" style="color:${data.is_required?'var(--green)':'var(--text3)'}">${data.is_required?'是':'否'}</span>
+          <label class="toggle"><input type="checkbox" id="dc-u-is-required" ${data.is_required?'checked':''} onchange="_updToggle('dc-u-is-required','dc-u-req-st')"><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+        </div>
+      </div>
+      <span class="d-hint">※ 改为必填时，若品类下有商品缺少该属性值将被拦截</span>
+    </div>`;
+}
+function _drawerAdDelete(data) {
+  _setDrawerHeader(`删除属性定义 · ${data.attr_name}`, '此操作不可恢复，请谨慎确认', '确认删除', true);
+  document.getElementById('d-body').innerHTML = `
+    <div class="d-warn">⚠️ 即将逻辑删除属性定义「<strong>${data.attr_name}</strong>」（ID: ${data.id}）。<br><br>
+    删除后该属性从列表中隐藏，相关商品的属性值记录仍保留在数据库中。</div>`;
+}
+
+// --- 属性定义 保存 ---
+async function _saveAdCreate() {
+  const catId = document.getElementById('dc-c-category').value;
+  const name  = document.getElementById('dc-c-attr-name').value.trim();
+  const vtype = document.getElementById('dc-c-value-type').value;
+  const isReq = document.getElementById('dc-c-is-required').checked;
+  if (!catId) { toast('请选择所属品类', 'error'); return; }
+  if (!name)  { toast('请填写属性名称', 'error'); return; }
+  const r = await apiReq('POST', `${BASE}/attr-defs/create/`, { category: parseInt(catId), attr_name: name, value_type: vtype, is_required: isReq });
+  if (r.ok) { toast(r.data.message || '创建成功', 'success'); closeDrawer(); delete adAttrDefCache[catId]; if (currentAdCatId == catId) adLoad(); }
+}
+async function _saveAdEdit() {
+  const name  = document.getElementById('dc-u-attr-name').value.trim();
+  const isReq = document.getElementById('dc-u-is-required').checked;
+  const body  = { is_required: isReq };
+  if (name) body.attr_name = name;
+  const r = await apiReq('PATCH', `${BASE}/attr-defs/${editingId}/update/`, body);
+  if (r.ok) { toast(r.data.message || '修改成功', 'success'); closeDrawer(); if (currentAdCatId) { delete adAttrDefCache[currentAdCatId]; adLoad(); } }
+}
+async function _saveAdDelete() {
+  const r = await apiReq('DELETE', `${BASE}/attr-defs/${editingId}/delete/`);
+  if (r.ok) { toast(r.data.message || '删除成功', 'success'); closeDrawer(); if (currentAdCatId) { delete adAttrDefCache[currentAdCatId]; adLoad(); } }
+}
+
+// ══════════════════════════════════════════════
+// 商品模块
+// ══════════════════════════════════════════════
+async function prodLoad() {
+  const catId = document.getElementById('prod-filter-cat').value;
+  currentProdCatFilter = catId || null;
+  const area = document.getElementById('prod-data');
+  area.innerHTML = '<div class="empty-state"><div class="empty-icon">⏳</div><div class="empty-text">加载中...</div></div>';
+  const url = catId ? `${BASE}/products/dir/?category_id=${catId}` : `${BASE}/products/dir/`;
+  const r = await apiReq('GET', url);
+  if (!r.ok || !r.data.success) { area.innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-text">加载失败</div></div>'; return; }
+  const list = r.data.data || [];
+  allProducts = list;
+  allProducts.forEach(p => { productMap[p.id] = { product_name: p.product_name, category_id: p.category_id }; });
+  document.getElementById('nc-prod').textContent = list.length;
+  _populateSelect('val-filter-prod', allProducts, '— 请选择商品 —', p => p.id, p => `${p.product_name}（#${p.id}）`);
+  prodRenderModule(list, catId);
+}
+function prodRenderModule(list, catFilter) {
+  const area = document.getElementById('prod-data');
+  const filterLabel = catFilter ? `「${catMap[catFilter]||catFilter}」` : '全部品类';
+  if (!list.length) {
+    area.innerHTML = `<div class="empty-state"><div class="empty-icon">📦</div><div class="empty-text">「${filterLabel}」暂无商品<br>点击右上角「＋ 新增商品」添加</div></div>`;
+    return;
+  }
+  const cards = list.map(p => {
+    const catName = catMap[p.category_id] || `品类#${p.category_id}`;
+    const price = parseFloat(p.product_price).toFixed(2);
+    const stock = p.product_stock;
+    const sc = stock === 0 ? 'stock-zero' : stock < 10 ? 'stock-low' : 'stock-ok';
+    const sl = stock === 0 ? '缺货' : `库存 ${stock}`;
+    const imgHtml = p.product_image ? `<img src="${p.product_image}" alt="" onerror="this.style.display='none'">` : '📦';
+    return `<div class="prod-card">
+      <div class="pc-thumb">${imgHtml}</div>
+      <div class="pc-actions">
+        <button class="btn-row-edit" onclick="prodOpenEdit(${p.id})">编辑信息</button>
+        <button class="btn-row-attrs" onclick="prodOpenAttrs(${p.id})">属性值</button>
+        <button class="btn-row-del" onclick="prodOpenDelete(${p.id},'${p.product_name.replace(/'/g,"\\'")}')">删除</button>
+      </div>
+      <div class="pc-body">
+        <div class="pc-name" title="${p.product_name}">${p.product_name}</div>
+        <div class="pc-price">¥ ${price}</div>
+        <div class="pc-meta"><span class="stock-chip ${sc}">${sl}</span><span class="pc-cat">${catName}</span></div>
+      </div>
+    </div>`;
+  }).join('');
+  area.innerHTML = `<div class="data-card"><div class="dc-header"><span class="dc-title">${filterLabel} · 商品列表</span><span class="dc-count">${list.length} 件商品</span></div><div class="prod-grid">${cards}</div></div>`;
+}
+async function prodOpenEdit(id) {
+  const prod = allProducts.find(p => p.id === id); if (!prod) return;
+  openDrawer('prod-edit', prod);
+  // 异步加载属性数据（填充抽屉）
+  const cont = document.getElementById('dc-p-attrs-container'); if (!cont) return;
+  cont.innerHTML = '<div style="font-size:12px;color:var(--text3);display:flex;align-items:center;gap:6px"><span class="spinner-sm"></span>加载属性值...</div>';
+  try {
+    const [defsRes, valsRes] = await Promise.all([
+      fetch(`${BASE}/attr-defs/dir/?category_id=${prod.category_id}`, { headers: authHeaders() }),
+      fetch(`${BASE}/attr-values/dir/?product_id=${id}`, { headers: authHeaders() })
+    ]);
+    const defsData = await defsRes.json(), valsData = await valsRes.json();
+    const defs = defsData.success ? (defsData.data || []) : [];
+    const vals = valsData.success ? (valsData.data || []) : [];
+    defs.forEach(a => { adAttrDefMap[a.id] = { attr_name: a.attr_name, value_type: a.value_type, is_required: a.is_required }; });
+    const existingMap = {};
+    vals.forEach(v => { existingMap[v.attr_def_id] = v; });
+    _prodRenderAttrFields('dc-p-attrs-container', defs, existingMap);
+  } catch(e) { if (cont) cont.innerHTML = '<div style="font-size:12px;color:var(--red)">属性加载失败</div>'; }
+}
+function prodOpenDelete(id, name) { openDrawer('prod-delete', { id, product_name: name }); }
+function prodOpenAttrs(id) {
+  const prod = allProducts.find(p => p.id === id); if (!prod) return;
+  openDrawer('prod-attrs', prod);
+}
+async function _drawerProdAttrs(prod) {
+  const productId = prod.id;
+  currentValProdId = String(productId);
+  _setDrawerHeader(`🔖 ${prod.product_name}`, '属性值总览 — 点击填写或编辑各属性槽位', '关闭');
+  document.getElementById('d-save-btn').style.display = 'none';
+  const body = document.getElementById('d-body');
+  body.innerHTML = '<div style="font-size:12px;color:var(--text3);display:flex;align-items:center;gap:6px;padding:8px 0"><span class="spinner-sm"></span>加载属性数据…</div>';
+  try {
+    const pInfo = productMap[productId] || { category_id: prod.category_id };
+    const [defsRes, valsRes] = await Promise.all([
+      fetch(`${BASE}/attr-defs/dir/?category_id=${pInfo.category_id}`, { headers: authHeaders() }),
+      fetch(`${BASE}/attr-values/dir/?product_id=${productId}`, { headers: authHeaders() })
+    ]);
+    if (defsRes.status === 401 || valsRes.status === 401) { _handleUnauthorized(); return; }
+    const defsData = await defsRes.json(), valsData = await valsRes.json();
+    const defs = defsData.success ? (defsData.data || []) : [];
+    const vals = valsData.success ? (valsData.data || []) : [];
+    defs.forEach(a => { adAttrDefMap[a.id] = { attr_name: a.attr_name, value_type: a.value_type, is_required: a.is_required }; });
+    valAttrValuesCache[productId] = vals;
+    const existingMap = {};
+    vals.forEach(v => { existingMap[v.attr_def_id] = v; });
+    _renderAttrSlotsInDrawer(defs, existingMap, productId);
+  } catch(e) { body.innerHTML = '<div style="color:var(--red);font-size:13px">加载失败，请关闭后重试</div>'; }
+}
+function _renderAttrSlotsInDrawer(defs, existingMap, productId) {
+  const body = document.getElementById('d-body'); if (!body) return;
+  const filled = Object.keys(existingMap).length;
+  if (!defs.length) {
+    body.innerHTML = '<div class="empty-state" style="padding:30px 0"><div class="empty-icon">🏷</div><div class="empty-text">该品类暂无属性定义<br>请先在「属性定义」模块添加</div></div>'; return;
+  }
+  const rows = defs.map(def => {
+    const v = existingMap[def.id], hasVal = !!v;
+    const rawVal = hasVal ? _valGetDisplayValue(v) : null;
+    const isNull = rawVal === 'null';
+    const reqBadge = def.is_required ? `<span class="req-badge req-yes" style="margin-left:4px;font-size:10px">必填</span>` : '';
+    const valCell = hasVal && !isNull ? `<span class="val-mono">${rawVal}</span>`
+                  : hasVal ? `<span class="val-null">null</span>`
+                  : `<span class="val-empty">— 未填写 —</span>`;
+    const btn = hasVal
+      ? `<button class="btn-row-edit" onclick="_attrSlotEdit(${v.id})">编辑</button>`
+      : `<button class="btn-row-fill" onclick="_attrSlotFill(${def.id})">填写</button>`;
+    return `<tr class="attr-slot-tr">
+      <td class="attr-slot-td slot-name">${def.attr_name}${reqBadge}</td>
+      <td class="attr-slot-td"><span class="type-badge ${TYPE_CLASS[def.value_type]||''}">${TYPE_LABELS[def.value_type]||def.value_type}</span></td>
+      <td class="attr-slot-td">${valCell}</td>
+      <td class="attr-slot-td" style="width:60px;text-align:right">${btn}</td>
+    </tr>`;
+  }).join('');
+  body.innerHTML = `
+    <div style="font-size:12px;color:var(--text3);margin-bottom:12px">已填写 <strong style="color:var(--accent2)">${filled}</strong> / ${defs.length} 个属性</div>
+    <table class="attr-slot-table"><tbody>${rows}</tbody></table>`;
+}
+function _attrSlotEdit(valId) {
+  const list = valAttrValuesCache[currentValProdId] || [];
+  const record = list.find(v => v.id === valId); if (!record) return;
+  const def = adAttrDefMap[record.attr_def_id];
+  drawerMode = 'val-edit'; editingId = valId;
+  document.getElementById('d-save-btn').style.display = '';
+  _setDrawerHeader(`编辑属性值 · ${def ? def.attr_name : ''}`, '修改后点击「保存」', '保存修改');
+  const body = document.getElementById('d-body');
+  const backHtml = `<div class="attr-back-btn" onclick="_attrSlotBack()">← 返回属性总览</div>`;
+  const vtype = def ? def.value_type : null;
+  let inputHtml = '';
+  if (vtype==='str')   inputHtml = `<input id="dc-v-val-str"   class="d-input" type="text"   value="${record.value_str ?? ''}">`;
+  else if (vtype==='int')   inputHtml = `<input id="dc-v-val-int"   class="d-input" type="number" step="1"   value="${record.value_int ?? ''}">`;
+  else if (vtype==='float') inputHtml = `<input id="dc-v-val-float" class="d-input" type="number" step="any" value="${record.value_float ?? ''}">`;
+  else if (vtype==='bool') {
+    const checked = record.value_bool ?? false;
+    inputHtml = `<div class="toggle-row"><span class="toggle-label">布尔值</span><div class="toggle-wrap"><span class="toggle-status" id="dc-v-bool-st" style="color:${checked?'var(--green)':'var(--text3)'}">${checked?'true':'false'}</span><label class="toggle"><input type="checkbox" id="dc-v-val-bool" ${checked?'checked':''} onchange="_updBool('dc-v-val-bool','dc-v-bool-st')"><div class="toggle-track"></div><div class="toggle-thumb"></div></label></div></div>`;
+  }
+  body.innerHTML = `${backHtml}<div class="d-field"><label class="d-label">属性值 <span class="d-req">*</span> <span class="type-badge ${TYPE_CLASS[vtype]||''}">${TYPE_LABELS[vtype]||vtype}</span></label>${inputHtml}</div>`;
+}
+function _attrSlotFill(attrDefId) {
+  const def = adAttrDefMap[attrDefId]; if (!def) return;
+  const prod = allProducts.find(p => p.id == currentValProdId);
+  drawerMode = 'val-create';
+  document.getElementById('d-save-btn').style.display = '';
+  _setDrawerHeader(`填写属性值 · ${def.attr_name}`, prod ? `商品：${prod.product_name}` : '', '确认填写');
+  const ph = def.is_required ? '必填' : '选填';
+  let inputHtml = '';
+  if (def.value_type==='str')   inputHtml = `<input id="dc-v-val-str"   class="d-input" type="text"   placeholder="${ph}">`;
+  else if (def.value_type==='int')   inputHtml = `<input id="dc-v-val-int"   class="d-input" type="number" step="1"   placeholder="${ph}">`;
+  else if (def.value_type==='float') inputHtml = `<input id="dc-v-val-float" class="d-input" type="number" step="any" placeholder="${ph}">`;
+  else if (def.value_type==='bool')  inputHtml = `<div class="toggle-row"><span class="toggle-label">布尔值</span><div class="toggle-wrap"><span class="toggle-status" id="dc-v-bool-st" style="color:var(--text3)">false</span><label class="toggle"><input type="checkbox" id="dc-v-val-bool" onchange="_updBool('dc-v-val-bool','dc-v-bool-st')"><div class="toggle-track"></div><div class="toggle-thumb"></div></label></div></div>`;
+  const backHtml = `<div class="attr-back-btn" onclick="_attrSlotBack()">← 返回属性总览</div>`;
+  document.getElementById('d-body').innerHTML = `${backHtml}
+    <input type="hidden" id="dc-v-product-id" value="${currentValProdId}">
+    <input type="hidden" id="dc-v-attr-def-id" value="${attrDefId}">
+    <div class="d-field"><label class="d-label">属性值 <span class="d-req">*</span> <span class="type-badge ${TYPE_CLASS[def.value_type]||''}">${TYPE_LABELS[def.value_type]||def.value_type}</span>${def.is_required?'&nbsp;<span class="req-badge req-yes">必填</span>':''}</label>${inputHtml}</div>`;
+}
+function _attrSlotBack() {
+  const prod = allProducts.find(p => p.id == currentValProdId); if (!prod) { closeDrawer(); return; }
+  openDrawer('prod-attrs', prod);
+}
+
+// --- 商品 抽屉 ---
+function _drawerProdCreate() {
+  _setDrawerHeader('新增商品', '填写商品信息及动态属性', '创建商品');
+  const leaves = getLeafCategories();
+  document.getElementById('d-body').innerHTML = `
+    <div class="d-field">
+      <label class="d-label">所属品类 <span class="d-req">*</span></label>
+      <select id="dc-p-category" class="d-select" onchange="_drawerProdOnCatChange()"><option value="">— 请选择末级品类 —</option></select>
+      <span class="d-hint">创建后不可修改</span>
+    </div>
+    <div class="d-field">
+      <label class="d-label">商品名称 <span class="d-req">*</span></label>
+      <input id="dc-p-name" class="d-input" type="text" placeholder="例：羊绒大衣A款">
+    </div>
+    <div class="d-field-row">
+      <div class="d-field" style="margin-bottom:0">
+        <label class="d-label">价格（元）<span class="d-req">*</span></label>
+        <input id="dc-p-price" class="d-input" type="number" min="0" step="0.01" placeholder="0.00">
+      </div>
+      <div class="d-field" style="margin-bottom:0">
+        <label class="d-label">库存数量</label>
+        <input id="dc-p-stock" class="d-input" type="number" min="0" step="1" placeholder="0">
+      </div>
+    </div>
+    <div class="d-field">
+      <label class="d-label">商品图片</label>
+      <div class="img-upload" id="dc-p-img-area" onclick="document.getElementById('dc-p-img-file').click()">
+        <input type="file" id="dc-p-img-file" accept="image/*" onchange="_prodPreviewImg('dc-p')" style="display:none">
+        <div id="dc-p-img-placeholder" class="img-ph"><div class="img-ph-icon">🖼</div><div class="img-ph-text">点击上传图片（可选）<br><span style="font-size:10px">JPG / PNG / WebP</span></div></div>
+        <img id="dc-p-img-preview" class="img-preview" alt="">
+      </div>
+      <span class="img-clear-btn" id="dc-p-img-clear" onclick="_prodClearImg('dc-p')">✕ 移除图片</span>
+    </div>
+    <div id="dc-p-attrs-wrap" style="display:none">
+      <div class="d-section">动态属性</div>
+      <div id="dc-p-attrs-container"></div>
+    </div>`;
+  _populateSelect('dc-p-category', leaves, '— 请选择末级品类 —', c => c.id, catLabel);
+}
+function _drawerProdEdit(data) {
+  _setDrawerHeader(`编辑商品 · ${data.product_name}`, '修改后点击「保存修改」', '保存修改');
+  const catName = catMap[data.category_id] || `品类#${data.category_id}`;
+  document.getElementById('d-body').innerHTML = `
+    <div class="d-info">ℹ️ 所属品类（${catName}）不可修改。</div>
+    <div class="d-field" style="margin-top:16px;">
+      <label class="d-label">商品名称</label>
+      <input id="dc-p-name" class="d-input" type="text" value="${data.product_name||''}" placeholder="留空则不修改">
+    </div>
+    <div class="d-field-row">
+      <div class="d-field" style="margin-bottom:0">
+        <label class="d-label">价格（元）</label>
+        <input id="dc-p-price" class="d-input" type="number" min="0" step="0.01" value="${data.product_price||''}" placeholder="留空则不修改">
+      </div>
+      <div class="d-field" style="margin-bottom:0">
+        <label class="d-label">库存数量</label>
+        <input id="dc-p-stock" class="d-input" type="number" min="0" step="1" value="${data.product_stock!==undefined?data.product_stock:''}" placeholder="留空则不修改">
+      </div>
+    </div>
+    <div class="d-field">
+      <label class="d-label">替换图片</label>
+      <div class="img-upload" id="dc-p-img-area" onclick="document.getElementById('dc-p-img-file').click()">
+        <input type="file" id="dc-p-img-file" accept="image/*" onchange="_prodPreviewImg('dc-p')" style="display:none">
+        <div id="dc-p-img-placeholder" class="img-ph"><div class="img-ph-icon">🖼</div><div class="img-ph-text">点击选择新图片（可选）</div></div>
+        <img id="dc-p-img-preview" class="img-preview" alt="">
+      </div>
+      <span class="img-clear-btn" id="dc-p-img-clear" onclick="_prodClearImg('dc-p')">✕ 移除图片</span>
+    </div>
+    <div class="d-section">动态属性</div>
+    <div id="dc-p-attrs-container"><div style="font-size:12px;color:var(--text3);display:flex;align-items:center;gap:6px"><span class="spinner-sm"></span>加载中...</div></div>`;
+}
+function _drawerProdDelete(data) {
+  _setDrawerHeader(`删除商品 · ${data.product_name}`, '此操作不可恢复，请谨慎确认', '确认删除', true);
+  document.getElementById('d-body').innerHTML = `
+    <div class="d-warn">⚠️ 即将逻辑删除商品「<strong>${data.product_name}</strong>」（ID: ${data.id}）。<br><br>
+    删除后商品从列表中隐藏，同时该商品的所有属性值记录也将一并逻辑删除。</div>`;
+}
+async function _drawerProdOnCatChange() {
+  const catId = document.getElementById('dc-p-category').value;
+  const wrap = document.getElementById('dc-p-attrs-wrap');
+  const cont = document.getElementById('dc-p-attrs-container');
+  if (!catId) { wrap.style.display = 'none'; cont.innerHTML = ''; return; }
+  wrap.style.display = 'block';
+  cont.innerHTML = '<div style="font-size:12px;color:var(--text3);display:flex;align-items:center;gap:6px"><span class="spinner-sm"></span>加载属性定义...</div>';
+  try {
+    const res = await fetch(`${BASE}/attr-defs/dir/?category_id=${catId}`, { headers: authHeaders() });
+    const data = await res.json();
+    const defs = data.success ? (data.data || []) : [];
+    defs.forEach(a => { adAttrDefMap[a.id] = { attr_name: a.attr_name, value_type: a.value_type, is_required: a.is_required }; });
+    _prodRenderAttrFields('dc-p-attrs-container', defs, {});
+  } catch { cont.innerHTML = '<div style="font-size:12px;color:var(--red)">加载失败，请重试</div>'; }
+}
+function _prodRenderAttrFields(containerId, attrDefs, existingMap) {
+  const container = document.getElementById(containerId); if (!container) return;
+  if (!attrDefs.length) { container.innerHTML = '<div style="font-size:12px;color:var(--text3);padding:4px 0">该品类暂无属性定义</div>'; return; }
+  container.innerHTML = attrDefs.map(def => {
+    const existing = existingMap[def.id] || {};
+    const reqMark = def.is_required ? '<span class="d-req">*</span>' : '';
+    const ph = def.is_required ? '必填' : '选填，留空则不填';
+    let inputHtml = '';
+    if (def.value_type === 'str') {
+      const v = (existing.value_str ?? '').replace(/"/g, '&quot;');
+      inputHtml = `<input id="attr-${def.id}" class="d-input" type="text" data-vtype="str" placeholder="${ph}" value="${v}">`;
+    } else if (def.value_type === 'int') {
+      const v = existing.value_int ?? '';
+      inputHtml = `<input id="attr-${def.id}" class="d-input" type="number" data-vtype="int" step="1" placeholder="${ph}" value="${v}">`;
+    } else if (def.value_type === 'float') {
+      const v = existing.value_float ?? '';
+      inputHtml = `<input id="attr-${def.id}" class="d-input" type="number" data-vtype="float" step="any" placeholder="${ph}" value="${v}">`;
+    } else if (def.value_type === 'bool') {
+      const checked = existing.value_bool ?? false;
+      const color = checked ? 'var(--green)' : 'var(--text3)';
+      inputHtml = `<div class="toggle-row"><span class="toggle-label">${def.is_required?'必填':'布尔值'}</span><div class="toggle-wrap"><span class="toggle-status" id="attr-st-${def.id}" style="color:${color}">${checked?'true':'false'}</span><label class="toggle"><input type="checkbox" id="attr-${def.id}" data-vtype="bool" ${checked?'checked':''} onchange="var s=document.getElementById('attr-st-${def.id}');s.textContent=this.checked?'true':'false';s.style.color=this.checked?'var(--green)':'var(--text3)'"><div class="toggle-track"></div><div class="toggle-thumb"></div></label></div></div>`;
+    }
+    return `<div class="d-field" data-attr-def-id="${def.id}"><label class="d-label">${def.attr_name} ${reqMark} <span class="type-badge ${TYPE_CLASS[def.value_type]||''}">${TYPE_LABELS[def.value_type]||def.value_type}</span></label>${inputHtml}</div>`;
+  }).join('');
+}
+function _prodCollectAttrValues() {
+  const container = document.getElementById('dc-p-attrs-container'); if (!container) return [];
+  const result = [];
+  container.querySelectorAll('[data-attr-def-id]').forEach(fieldEl => {
+    const attrDefId = parseInt(fieldEl.dataset.attrDefId);
+    const input = fieldEl.querySelector(`#attr-${attrDefId}`); if (!input) return;
+    const vtype = input.dataset.vtype;
+    const entry = { attr_def: attrDefId, value_str:null, value_int:null, value_float:null, value_bool:null };
+    if (vtype==='str')   entry.value_str   = input.value.trim() || null;
+    if (vtype==='int')   entry.value_int   = input.value !== '' ? parseInt(input.value)   : null;
+    if (vtype==='float') entry.value_float = input.value !== '' ? parseFloat(input.value) : null;
+    if (vtype==='bool')  entry.value_bool  = input.checked;
+    result.push(entry);
+  });
+  return result;
+}
+function _prodPreviewImg(prefix) {
+  const file = document.getElementById(`${prefix}-img-file`).files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const preview = document.getElementById(`${prefix}-img-preview`);
+    preview.src = e.target.result; preview.style.display = 'block';
+    document.getElementById(`${prefix}-img-placeholder`).style.display = 'none';
+    document.getElementById(`${prefix}-img-area`).classList.add('has-img');
+    document.getElementById(`${prefix}-img-area`).onclick = null;
+    document.getElementById(`${prefix}-img-clear`).style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+}
+function _prodClearImg(prefix) {
+  document.getElementById(`${prefix}-img-file`).value = '';
+  const preview = document.getElementById(`${prefix}-img-preview`); preview.src = ''; preview.style.display = 'none';
+  document.getElementById(`${prefix}-img-placeholder`).style.display = '';
+  document.getElementById(`${prefix}-img-area`).classList.remove('has-img');
+  document.getElementById(`${prefix}-img-area`).onclick = () => document.getElementById(`${prefix}-img-file`).click();
+  document.getElementById(`${prefix}-img-clear`).style.display = 'none';
+}
+
+// --- 商品 保存 ---
+async function _saveProdCreate() {
+  const catId = document.getElementById('dc-p-category').value;
+  const name  = document.getElementById('dc-p-name').value.trim();
+  const price = document.getElementById('dc-p-price').value;
+  const stock = document.getElementById('dc-p-stock').value;
+  const file  = document.getElementById('dc-p-img-file').files[0];
+  if (!catId) { toast('请选择所属品类', 'error'); return; }
+  if (!name)  { toast('请填写商品名称', 'error'); return; }
+  if (price === '') { toast('请填写价格', 'error'); return; }
+  const fd = new FormData();
+  fd.append('category', catId); fd.append('product_name', name);
+  fd.append('product_price', price); fd.append('product_stock', stock || 0);
+  if (file) fd.append('product_image', file);
+  const attrValues = _prodCollectAttrValues();
+  if (attrValues.length) fd.append('attr_values', JSON.stringify(attrValues));
+  const r = await apiMultipart('POST', `${BASE}/products/create/`, fd);
+  if (r.ok) { toast(r.data.message || '创建成功', 'success'); closeDrawer(); prodLoad(); }
+}
+async function _saveProdEdit() {
+  const name  = document.getElementById('dc-p-name').value.trim();
+  const price = document.getElementById('dc-p-price').value;
+  const stock = document.getElementById('dc-p-stock').value;
+  const file  = document.getElementById('dc-p-img-file').files[0];
+  const attrValues = _prodCollectAttrValues();
+  if (!name && price === '' && stock === '' && !file && !attrValues.length) { toast('请至少填写一项修改内容', 'error'); return; }
+  if (file) {
+    const fd = new FormData();
+    if (name) fd.append('product_name', name);
+    if (price !== '') fd.append('product_price', price);
+    if (stock !== '') fd.append('product_stock', stock);
+    fd.append('product_image', file);
+    if (attrValues.length) fd.append('attr_values', JSON.stringify(attrValues));
+    const r = await apiMultipart('PATCH', `${BASE}/products/${editingId}/update/`, fd);
+    if (r.ok) { toast(r.data.message || '修改成功', 'success'); closeDrawer(); prodLoad(); }
+  } else {
+    const body = {};
+    if (name) body.product_name = name;
+    if (price !== '') body.product_price = parseFloat(price);
+    if (stock !== '') body.product_stock = parseInt(stock);
+    if (attrValues.length) body.attr_values = attrValues;
+    const r = await apiReq('PATCH', `${BASE}/products/${editingId}/update/`, body);
+    if (r.ok) { toast(r.data.message || '修改成功', 'success'); closeDrawer(); prodLoad(); }
+  }
+}
+async function _saveProdDelete() {
+  const r = await apiReq('DELETE', `${BASE}/products/${editingId}/delete/`);
+  if (r.ok) { toast(r.data.message || '删除成功', 'success'); closeDrawer(); prodLoad(); }
+}
+
+// ══════════════════════════════════════════════
+// 属性值模块
+// ══════════════════════════════════════════════
+async function valLoad() {
+  const productId = document.getElementById('val-filter-prod').value;
+  if (!productId) { toast('请先选择商品', 'error'); return; }
+  currentValProdId = productId;
+  const area = document.getElementById('val-data');
+  area.innerHTML = '<div class="empty-state"><div class="empty-icon">⏳</div><div class="empty-text">加载中...</div></div>';
+  const pInfo = productMap[productId];
+  if (!pInfo) { area.innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-text">商品信息未找到</div></div>'; return; }
+  try {
+    // 并发加载属性定义 + 当前商品已有属性值
+    const [defsRes, valsRes] = await Promise.all([
+      fetch(`${BASE}/attr-defs/dir/?category_id=${pInfo.category_id}`, { headers: authHeaders() }),
+      fetch(`${BASE}/attr-values/dir/?product_id=${productId}`, { headers: authHeaders() })
+    ]);
+    if (defsRes.status === 401 || valsRes.status === 401) { _handleUnauthorized(); return; }
+    const defsData = await defsRes.json(), valsData = await valsRes.json();
+    const defs = defsData.success ? (defsData.data || []) : [];
+    const vals = valsData.success ? (valsData.data || []) : [];
+    adAttrDefCache[pInfo.category_id] = defs;
+    defs.forEach(a => { adAttrDefMap[a.id] = { attr_name: a.attr_name, value_type: a.value_type, is_required: a.is_required }; });
+    valAttrValuesCache[productId] = vals;
+    // 构建 attrDefId → value 的映射
+    const existingMap = {};
+    vals.forEach(v => { existingMap[v.attr_def_id] = v; });
+    document.getElementById('nc-val').textContent = `${vals.length}/${defs.length}`;
+    valRenderModule(defs, existingMap, productId);
+  } catch(e) {
+    area.innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-text">加载失败，请刷新重试</div></div>';
+  }
+}
+function _valGetDisplayValue(record) {
+  if (record.value_str   != null) return `"${record.value_str}"`;
+  if (record.value_int   != null) return String(record.value_int);
+  if (record.value_float != null) return String(record.value_float);
+  if (record.value_bool  != null) return record.value_bool ? 'true' : 'false';
+  return 'null';
+}
+function valRenderModule(defs, existingMap, productId) {
+  const area = document.getElementById('val-data');
+  const productName = productMap[productId]?.product_name || `商品 #${productId}`;
+  if (!defs.length) {
+    area.innerHTML = `<div class="empty-state"><div class="empty-icon">🔖</div><div class="empty-text">「${productName}」所属品类暂无属性定义<br>请先在「属性定义」模块为该品类添加属性</div></div>`;
+    return;
+  }
+  const filledCount = Object.keys(existingMap).length;
+  const rows = defs.map(def => {
+    const v = existingMap[def.id];
+    const hasVal = !!v;
+    const rawVal = hasVal ? _valGetDisplayValue(v) : null;
+    const isNull = rawVal === 'null';
+    const reqBadge = def.is_required ? `<span class="req-badge req-yes" style="margin-left:4px">必填</span>` : '';
+    const valCell = hasVal && !isNull
+      ? `<span class="val-mono">${rawVal}</span>`
+      : hasVal ? `<span class="val-null">null</span>`
+               : `<span class="val-empty">— 未填写 —</span>`;
+    const actionBtn = hasVal
+      ? `<button class="btn-row-edit" onclick="valOpenEdit(${v.id})">编辑</button>`
+      : `<button class="btn-row-fill" onclick="valOpenFill(${def.id})">填写</button>`;
+    return `<tr class="val-tr">
+      <td class="val-td" style="font-weight:500;color:var(--text)">${def.attr_name}${reqBadge}</td>
+      <td class="val-td"><span class="type-badge ${TYPE_CLASS[def.value_type]||''}">${TYPE_LABELS[def.value_type]||def.value_type}</span></td>
+      <td class="val-td">${valCell}</td>
+      <td class="val-td" style="width:70px">${actionBtn}</td>
+    </tr>`;
+  }).join('');
+  area.innerHTML = `<div class="data-card">
+    <div class="dc-header">
+      <span class="dc-title">「${productName}」· 属性总览</span>
+      <span class="dc-count">${filledCount} / ${defs.length} 已填写</span>
+    </div>
+    <table class="val-table">
+      <thead><tr><th class="val-th">属性名</th><th class="val-th">类型</th><th class="val-th">当前值</th><th class="val-th" style="width:70px"></th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
+}
+function valOpenEdit(id) {
+  const list = valAttrValuesCache[currentValProdId] || [];
+  const record = list.find(v => v.id === id); if (!record) return;
+  const def = adAttrDefMap[record.attr_def_id];
+  openDrawer('val-edit', { id, record, def });
+}
+function valOpenFill(attrDefId) {
+  const def = adAttrDefMap[attrDefId]; if (!def) return;
+  openDrawer('val-create', { productId: currentValProdId, attrDefId, def });
+}
+
+// --- 属性值 抽屉 ---
+function _drawerValCreate(data) {
+  const { productId, attrDefId, def } = data;
+  const productName = productMap[productId]?.product_name || `商品 #${productId}`;
+  _setDrawerHeader(`填写属性值 · ${def.attr_name}`, `商品：${productName}`, '确认填写');
+  let inputHtml = '';
+  const ph = def.is_required ? '必填' : '选填，留空则为 null';
+  if (def.value_type==='str')   inputHtml = `<input id="dc-v-val-str"   class="d-input" type="text"   placeholder="${ph}">`;
+  else if (def.value_type==='int')   inputHtml = `<input id="dc-v-val-int"   class="d-input" type="number" step="1"   placeholder="${ph}">`;
+  else if (def.value_type==='float') inputHtml = `<input id="dc-v-val-float" class="d-input" type="number" step="any" placeholder="${ph}">`;
+  else if (def.value_type==='bool')  inputHtml = `<div class="toggle-row"><span class="toggle-label">布尔值</span><div class="toggle-wrap"><span class="toggle-status" id="dc-v-bool-st" style="color:var(--text3)">false</span><label class="toggle"><input type="checkbox" id="dc-v-val-bool" onchange="_updBool('dc-v-val-bool','dc-v-bool-st')"><div class="toggle-track"></div><div class="toggle-thumb"></div></label></div></div>`;
+  document.getElementById('d-body').innerHTML = `
+    <input type="hidden" id="dc-v-product-id" value="${productId}">
+    <input type="hidden" id="dc-v-attr-def-id" value="${attrDefId}">
+    <div class="d-info">📦 商品：${productName}<br>🏷 属性：${def.attr_name}&nbsp;<span class="type-badge ${TYPE_CLASS[def.value_type]||''}">${TYPE_LABELS[def.value_type]||def.value_type}</span>${def.is_required?'&nbsp;<span class="req-badge req-yes">必填</span>':''}</div>
+    <div class="d-field" style="margin-top:16px;">
+      <label class="d-label">属性值 <span class="d-req">*</span></label>
+      ${inputHtml}
+    </div>`;
+}
+function _drawerValEdit(data) {
+  const { record, def } = data;
+  const attrName = def ? def.attr_name : `属性定义 #${record.attr_def_id}`;
+  _setDrawerHeader(`编辑属性值 · ${attrName}`, '只允许修改属性值本身', '保存修改');
+  const vtype = def ? def.value_type : null;
+  let inputHtml = '';
+  if (vtype==='str')   inputHtml = `<input id="dc-v-val-str"   class="d-input" type="text"   value="${record.value_str ?? ''}">`;
+  else if (vtype==='int')   inputHtml = `<input id="dc-v-val-int"   class="d-input" type="number" step="1"   value="${record.value_int ?? ''}">`;
+  else if (vtype==='float') inputHtml = `<input id="dc-v-val-float" class="d-input" type="number" step="any" value="${record.value_float ?? ''}">`;
+  else if (vtype==='bool') {
+    const checked = record.value_bool ?? false;
+    const color = checked ? 'var(--green)' : 'var(--text3)';
+    inputHtml = `<div class="toggle-row"><span class="toggle-label">布尔值</span><div class="toggle-wrap"><span class="toggle-status" id="dc-v-bool-st" style="color:${color}">${checked?'true':'false'}</span><label class="toggle"><input type="checkbox" id="dc-v-val-bool" ${checked?'checked':''} onchange="_updBool('dc-v-val-bool','dc-v-bool-st')"><div class="toggle-track"></div><div class="toggle-thumb"></div></label></div></div>`;
+  }
+  document.getElementById('d-body').innerHTML = `
+    <div class="d-info">ℹ️ 只允许修改属性值本身，不可更换商品或属性定义。</div>
+    <div class="d-field" style="margin-top:16px;">
+      <label class="d-label">属性名（不可更改）</label>
+      <input class="d-input" type="text" value="${attrName}" disabled>
+    </div>
+    <div class="d-field">
+      <label class="d-label">属性值 <span class="d-req">*</span> <span class="type-badge ${TYPE_CLASS[vtype]||''}">${TYPE_LABELS[vtype]||vtype}</span></label>
+      ${inputHtml}
+    </div>`;
+}
+
+// --- 属性值 保存 ---
+async function _saveValCreate() {
+  const productId = document.getElementById('dc-v-product-id')?.value;
+  const attrDefId = document.getElementById('dc-v-attr-def-id')?.value;
+  if (!productId || !attrDefId) { toast('数据异常，请重新打开', 'error'); return; }
+  const def = adAttrDefMap[attrDefId]; if (!def) { toast('属性定义数据异常', 'error'); return; }
+  const body = { product: parseInt(productId), attr_def: parseInt(attrDefId), value_str:null, value_int:null, value_float:null, value_bool:null };
+  const vtype = def.value_type;
+  if (vtype==='str')   { const v=document.getElementById('dc-v-val-str').value.trim(); if(def.is_required&&!v){toast('该属性为必填项','error');return;} body.value_str=v||null; }
+  else if (vtype==='int')   { const v=document.getElementById('dc-v-val-int').value; if(def.is_required&&v===''){toast('该属性为必填项','error');return;} body.value_int=v!==''?parseInt(v):null; }
+  else if (vtype==='float') { const v=document.getElementById('dc-v-val-float').value; if(def.is_required&&v===''){toast('该属性为必填项','error');return;} body.value_float=v!==''?parseFloat(v):null; }
+  else if (vtype==='bool')  body.value_bool = document.getElementById('dc-v-val-bool').checked;
+  const r = await apiReq('POST', `${BASE}/attr-values/create/`, body);
+  if (r.ok) { toast(r.data.message || '填写成功', 'success'); _attrSlotBack(); }
+}
+async function _saveValEdit() {
+  const list = valAttrValuesCache[currentValProdId] || [], record = list.find(v => v.id === editingId);
+  if (!record) { toast('属性值记录未找到，请重新加载', 'error'); return; }
+  const def = adAttrDefMap[record.attr_def_id]; if (!def) { toast('属性定义数据异常', 'error'); return; }
+  const body = { value_str:null, value_int:null, value_float:null, value_bool:null };
+  const vtype = def.value_type;
+  if (vtype==='str')   body.value_str   = document.getElementById('dc-v-val-str').value.trim() || null;
+  if (vtype==='int')   { const v=document.getElementById('dc-v-val-int').value; body.value_int=v!==''?parseInt(v):null; }
+  if (vtype==='float') { const v=document.getElementById('dc-v-val-float').value; body.value_float=v!==''?parseFloat(v):null; }
+  if (vtype==='bool')  body.value_bool = document.getElementById('dc-v-val-bool').checked;
+  const r = await apiReq('PATCH', `${BASE}/attr-values/${editingId}/update/`, body);
+  if (r.ok) { toast(r.data.message || '修改成功', 'success'); _attrSlotBack(); }
+}
+
+// ══════════════════════════════════════════════
+// 共用小工具
+// ══════════════════════════════════════════════
+function _updToggle(checkId, statusId) {
+  const checked = document.getElementById(checkId).checked;
+  const el = document.getElementById(statusId);
+  el.textContent = checked ? '是' : '否';
+  el.style.color = checked ? 'var(--green)' : 'var(--text3)';
+}
+function _updBool(checkId, statusId) {
+  const checked = document.getElementById(checkId).checked;
+  const el = document.getElementById(statusId);
+  el.textContent = checked ? 'true' : 'false';
+  el.style.color = checked ? 'var(--green)' : 'var(--text3)';
+}
+
+// ══════════════════════════════════════════════
+// Toast
+// ══════════════════════════════════════════════
+let _toastTimer;
+function toast(msg, type = 'info') {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.className = `toast ${type} show`;
+  clearTimeout(_toastTimer); _toastTimer = setTimeout(() => el.classList.remove('show'), 2800);
+}
+
+// ══════════════════════════════════════════════
+// 初始化
+// ══════════════════════════════════════════════
+async function init() {
+  if (!checkAuth()) return;
+  const uname = getUsername();
+  document.getElementById('username-display').textContent = uname;
+  document.getElementById('user-avatar').textContent = uname.charAt(0).toUpperCase();
+  // 默认激活品类管理
+  switchModule('cat');
+}
+window.onload = init;
+</script>
+</body>
+</html>

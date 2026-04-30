@@ -1,6 +1,6 @@
 # 微格商品展示网站 · 开发日志
 
-> 记录日期：2026-04-21 / 最近更新：2026-04-22
+> 记录日期：2026-04-21 / 最近更新：2026-05-01
 > 技术栈：Django 5.2 + Django REST Framework + MySQL 8
 > 项目地址：https://github.com/SomnusZ/weige.git
 
@@ -20,6 +20,9 @@
 10. [测试页面](#10-测试页面)
 11. [未完成计划](#11-未完成计划)
 12. [2026-04-22 改造日志](#12-2026-04-22-改造日志)
+13. [2026-04-27 用户认证与管理后台](#13-2026-04-27-用户认证与管理后台)
+14. [2026-04-30 管理后台重设计 + 接口权限](#14-2026-04-30-管理后台重设计--接口权限)
+15. [2026-05-01 管理后台 UI 迭代](#15-2026-05-01-管理后台-ui-迭代)
 
 ---
 
@@ -272,6 +275,17 @@ weige/
 │   ├── dicts.py                    ← 全局枚举/字典项（DeleteStatus、AttrValueType）
 │   ├── utils.py                    ← 公共工具函数（统一响应格式）
 │   ├── test_views.py               ← 通用测试页面视图
+│   ├── admin_views.py              ← 管理后台视图（登录页/dashboard页/登录API）
+│   │
+│   ├── user/                       ← 用户模块（自定义 AbstractBaseUser）
+│   │   ├── __init__.py
+│   │   ├── apps.py
+│   │   ├── models.py               ← User 模型（手机号登录）
+│   │   ├── managers.py             ← UserManager（create_user / create_superuser）
+│   │   ├── serializers.py          ← 登录/用户信息序列化器
+│   │   ├── views.py                ← 登录/刷新Token/用户信息接口
+│   │   ├── urls.py
+│   │   └── admin.py
 │   │
 │   ├── category/                   ← 品类模块
 │   │   ├── models.py
@@ -302,9 +316,13 @@ weige/
 │       └── admin.py
 │
 └── templates/
+    ├── login.html                  ✅ 正式登录页
+    ├── dashboard.html              ✅ 正式管理后台
     └── test/                       ← 测试页面模板目录
         ├── category.html           ✅ 已完成
-        └── category_attr_def.html  ✅ 已完成
+        ├── category_attr_def.html  ✅ 已完成
+        ├── product.html            ✅ 已完成
+        └── product_attr_value.html ✅ 已完成
 ```
 
 ---
@@ -1004,22 +1022,27 @@ Category.objects.filter(category_name=name, is_delete=DeleteStatus.NORMAL)
 
 - [x] ~~完成 `product` 测试页面~~（2026-04-22 完成，含动态属性字段）
 - [x] ~~完成 `product_attr_value` 测试页面~~（2026-04-22 完成，DELETE 面板已移除）
-- [ ] 各模块接口联调测试
-- [ ] 执行数据库迁移：`python manage.py makemigrations && python manage.py migrate`
-- [ ] 创建管理员账号：`python manage.py createsuperuser`
+- [x] ~~用户模块（AbstractBaseUser + JWT）~~（2026-04-27 完成）
+- [x] ~~正式登录页 login.html~~（2026-04-27 完成）
+- [x] ~~正式管理后台 dashboard.html~~（2026-04-27 完成）
+- [x] ~~创建超级管理员账号~~（2026-04-27 完成，`python manage.py createsuperuser`）
+- [ ] 各模块接口联调测试（进行中）
+- [x] ~~接口加入 `IsAuthenticated` 权限校验~~（2026-04-30 完成）
+- [x] ~~管理后台 dashboard.html 重设计~~（2026-04-30 完成，详见第 14、15 章）
 
-### 中期任务
+### 中期任务（优先级从高到低）
 
-- [ ] 商品展示前端页面（仿 1688 商品列表 + 详情页）
-- [ ] 基于品类属性的筛选过滤功能
-- [ ] 商品图片上传与展示
-- [ ] Django Admin 后台美化与配置
+- [ ] **前台商品展示页**（仿 1688 商品列表 + 详情页，面向访客）
+- [ ] **按品类属性筛选商品**（前台核心功能，基于 EAV 动态过滤）
+- [ ] **商品关键词搜索**（商品名称模糊搜索）
+- [ ] 图片存储优化（当前存本地，考虑接入对象存储）
 
 ### 待讨论
 
-- [ ] 品类删除后，其下商品如何处理（当前 Product.category 是 `on_delete=PROTECT`，即有商品时品类无法删除）
-- [ ] 是否需要商品搜索功能（关键词搜索）
+- [x] ~~品类删除后，其下商品如何处理~~（2026-05-01 已决策：有商品时拒绝删除，显示明确提示，详见第 15.8 节）
 - [ ] 是否需要商品排序功能（按价格、库存等）
+- [ ] 前台是否需要用户注册/收藏/购物车等功能
+- [ ] 是否需要商品搜索功能（关键词搜索）
 
 ---
 
@@ -1344,3 +1367,601 @@ with transaction.atomic():
 3. **不需要**：改 HTTP 方法、返回 410 状态码、修改路由。
 
 **结论：弃用 ≠ 删除；弃用 ≠ 改方法。代码保留，注释标记，前端隐藏入口，是最稳妥的弃用方式。**
+
+---
+
+## 13. 2026-04-27 用户认证与管理后台
+
+> 本次改造完成了用户体系从零到一的建设，包括自定义用户模型、JWT 认证、正式登录页和管理后台。
+> 涉及文件：`app/user/`（新增）、`app/admin_views.py`（新增）、`weige/settings.py`、`weige/urls.py`、
+> `templates/login.html`（新增）、`templates/dashboard.html`（新增）
+
+---
+
+### 13.1 用户模型设计：AbstractBaseUser
+
+#### 选型讨论
+
+| 方案 | 说明 | 适用场景 |
+|------|------|------|
+| `AbstractUser` | 继承内置 User，保留 username 字段，扩展额外字段 | 只需加几个字段，login 字段仍用 username/email |
+| `AbstractBaseUser` ✅ | 完全自定义，只保留密码哈希能力 | 需要自定义登录字段（如手机号），或未来扩展游客账号 |
+
+**决策：** 采用 `AbstractBaseUser + PermissionsMixin`。
+- 登录字段改为 `phone`（手机号），彻底去掉 `username`
+- `PermissionsMixin` 提供 `is_superuser` 和 Django Admin 权限体系
+- 未来若需要游客账号，只需在现有模型上扩展，无需迁移
+
+#### User 模型（`app/user/models.py`）
+
+```python
+class User(AbstractBaseUser, PermissionsMixin):
+    phone       = CharField(max_length=20, unique=True)   # 登录字段
+    nickname    = CharField(max_length=50, blank=True)
+    is_active   = BooleanField(default=True)
+    is_staff    = BooleanField(default=False)              # 是否可进 Django Admin
+    create_time = DateTimeField(auto_now_add=True)
+
+    USERNAME_FIELD  = 'phone'    # 替代默认的 username
+    REQUIRED_FIELDS = []         # createsuperuser 不额外询问字段
+
+    class Meta:
+        app_label = 'user'       # 必填：嵌套包路径下需显式声明
+        db_table  = 'user'
+```
+
+> ⚠️ **关键：`app_label = 'user'` 必须显式声明。**
+> 应用路径为 `app.user`（嵌套包），若不声明，Django shell 中导入模型会报
+> `RuntimeError: Model class doesn't declare an explicit app_label and isn't in an application in INSTALLED_APPS`。
+
+#### UserManager（`app/user/managers.py`）
+
+```python
+class UserManager(BaseUserManager):
+    def create_user(self, phone, password=None, **extra_fields):
+        user = self.model(phone=phone, **extra_fields)
+        user.set_password(password)   # 哈希加密
+        user.save(using=self._db)
+        return user
+
+    def create_superuser(self, phone, password, **extra_fields):
+        extra_fields.setdefault('is_staff', True)
+        extra_fields.setdefault('is_superuser', True)
+        extra_fields.setdefault('is_active', True)
+        return self.create_user(phone, password, **extra_fields)
+```
+
+---
+
+### 13.2 JWT 认证配置
+
+#### 选型：DRF Token vs JWT
+
+| | DRF Token | JWT（simplejwt）|
+|---|---|---|
+| 存储方式 | 数据库表 `authtoken_token` | 纯字符串，不存数据库 |
+| 验证方式 | 每次请求查数据库 | 服务端用密钥验签，无需查库 |
+| 依赖 | `rest_framework.authtoken` | `rest_framework_simplejwt` |
+| Token 结构 | 单个 token 字符串 | access（短期）+ refresh（长期）|
+| 适用场景 | 简单项目 | 需要 token 刷新、无状态服务 |
+
+**决策：** 采用 JWT（simplejwt），access token 有效期 2 小时，refresh token 7 天。
+
+#### settings.py 关键配置
+
+```python
+from datetime import timedelta
+
+INSTALLED_APPS = [
+    ...
+    'rest_framework_simplejwt',
+    'app.user',          # 必须在其他业务 app 之前
+    ...
+]
+
+AUTH_USER_MODEL = 'user.User'   # 告知 Django 使用自定义用户模型
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
+    'DEFAULT_PERMISSION_CLASSES': (
+        'rest_framework.permissions.AllowAny',   # 开发阶段全部公开
+    ),
+}
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME' : timedelta(hours=2),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    'AUTH_HEADER_TYPES'     : ('Bearer',),
+}
+```
+
+---
+
+### 13.3 登录 API（`app/admin_views.py`）
+
+```python
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def login_api(request):
+    phone    = request.data.get('username', '').strip()   # 前端字段名为 username
+    password = request.data.get('password', '').strip()
+
+    # authenticate() 按 USERNAME_FIELD 传参，自定义模型用 phone=
+    user = authenticate(request, phone=phone, password=password)
+    if not user:
+        return error_response('手机号或密码错误')
+
+    refresh = RefreshToken.for_user(user)
+    return success_response({
+        'access' : str(refresh.access_token),
+        'refresh': str(refresh),
+        'user'   : { 'id': user.id, 'phone': user.phone, ... },
+    }, message='登录成功')
+```
+
+> ⚠️ **关键：`authenticate()` 的关键字参数必须与 `USERNAME_FIELD` 一致。**
+> 自定义 User 的 `USERNAME_FIELD = 'phone'`，所以必须传 `phone=phone`，
+> 传 `username=phone` 会始终返回 `None`（认证永远失败）。
+
+---
+
+### 13.4 管理后台路由（`weige/urls.py`）
+
+```python
+from app import test_views, admin_views
+
+urlpatterns = [
+    path('admin/',      admin.site.urls),
+    path('login/',      admin_views.login_page,  name='login'),
+    path('dashboard/',  admin_views.dashboard_page, name='dashboard'),
+    path('api/auth/login/', admin_views.login_api, name='login-api'),
+    ...
+]
+```
+
+---
+
+### 13.5 前端登录页（`templates/login.html`）
+
+- 暗色卡片设计，手机号 + 密码输入框
+- 调用 `POST /api/auth/login/`，发送 `{ username, password }`
+- 登录成功后将 JWT 存入 localStorage：
+  ```javascript
+  localStorage.setItem('wg_token',   data.data.access);
+  localStorage.setItem('wg_refresh', data.data.refresh);
+  localStorage.setItem('wg_user',    JSON.stringify(data.data.user));
+  ```
+- 自动跳转至 `/dashboard/`
+
+---
+
+### 13.6 管理后台（`templates/dashboard.html`）
+
+- 单页面应用，暗色主题，左侧模块导航 + 右侧内容区
+- 四个业务模块：品类管理、属性定义、商品管理、属性值管理
+- 页面加载时检查 localStorage 中的 token，无 token 自动跳转登录页
+- 所有接口请求统一通过 `authFetch()` 封装，自动附加 `Authorization: Bearer <token>` 头，401 时自动跳登录页
+- 用户信息、退出登录显示在左侧边栏底部
+
+---
+
+### 13.7 迁移流程（踩坑记录）
+
+**背景：** `AUTH_USER_MODEL` 是在已有迁移记录的项目上新增的，`django.contrib.admin` 的迁移依赖 `auth.User`，会产生循环依赖导致 `InconsistentMigrationHistory` 报错。
+
+**解决步骤：**
+1. 临时注释掉 `INSTALLED_APPS` 中的 `'django.contrib.admin'` 及 `urls.py` 中的 `path('admin/', ...)`
+2. 执行 `python manage.py migrate user`，单独建 user 表
+3. 恢复 admin 注释
+4. 执行 `python manage.py migrate`，完成剩余迁移
+
+**根本原因：** Django 的 `check_consistent_history` 在 migrate 前会扫描所有已应用迁移的依赖链。`admin.0001_initial` 依赖 `auth.User`，而 `auth.User` 此时已被自定义 User 替代但迁移记录不存在，导致冲突。临时禁用 admin 可打破这条依赖链。
+
+---
+
+### 13.8 其他踩坑
+
+#### Token 认证方案切换导致的不匹配
+
+项目在不同阶段分别用过两套 Token 方案，最终统一为 JWT：
+
+| 时间 | 方案 | 遗留问题 |
+|------|------|------|
+| 早期 | DRF Token（`rest_framework.authtoken`）| `admin_views.py` 依赖 `authtoken_token` 表 |
+| 现在 | JWT（`rest_framework_simplejwt`）| `authtoken_token` 表已无用，可直接 `DROP TABLE` |
+
+切换后需同步：
+- `settings.py`：移除 `rest_framework.authtoken`，加入 `rest_framework_simplejwt`
+- `admin_views.py`：移除 `Token.objects.get_or_create()`，改用 `RefreshToken.for_user()`
+- `login.html`：响应字段从 `data.token` 改为 `data.access` + `data.refresh`
+
+#### `authenticate()` 字段名陷阱
+
+Django 的 `ModelBackend.authenticate()` 接受的关键字参数名必须与 `USERNAME_FIELD` 完全一致：
+
+```python
+# ❌ 错误：USERNAME_FIELD = 'phone'，传 username= 永远返回 None
+user = authenticate(request, username=phone, password=password)
+
+# ✅ 正确
+user = authenticate(request, phone=phone, password=password)
+```
+
+---
+
+## 14. 2026-04-30 管理后台重设计 + 接口权限
+
+> 本次改造完成了管理后台 UI 的完整重设计，以及接口层 IsAuthenticated 权限的全面落地。
+> 涉及文件：`templates/dashboard.html`（完整重写）、`weige/settings.py`、`app/user/views.py`
+
+---
+
+### 14.1 管理后台重设计（`templates/dashboard.html`）
+
+#### 背景与问题
+
+原始 `dashboard.html` 沿用了测试页面的 API-tester 风格：三栏布局（侧边导航 / 表单区 / 响应区），每个操作（查询/新增/编辑/删除）各占一个表单面板，还有 JSON 响应展示区。这种风格适合调试，不适合生产使用。
+
+用户反馈：
+1. 右侧的"响应结果"面板是测试产物，生产页面不应保留
+2. 导航栏和展示区太小，页面布局感觉拥挤
+3. **核心诉求**：每个模块的增删改查操作最好能在同一个页面里完成，减少来回切换
+
+#### 新设计方案
+
+**布局结构（2-column SPA）：**
+
+```
+┌──────────────────────────────────────────────────┐
+│  Topbar (logo · server badge · user pill · 退出)  │
+├──────────┬───────────────────────────────────────┤
+│          │  [mod-cat]  品类管理页（默认显示）        │
+│ Sidebar  │  [mod-ad]   属性定义页（含品类筛选）      │
+│  220px   │  [mod-prod] 商品管理页（含品类筛选）      │
+│  4个模块  │  [mod-val]  属性值页（含商品筛选）        │
+│  + 徽章  │                                         │
+│          │  [drawer-overlay]  遮罩                  │
+│          │  [drawer]          右侧抽屉 500px         │
+└──────────┴───────────────────────────────────────┘
+```
+
+**每个模块页的结构：**
+- 页头：模块标题 + 描述 + "新增"按钮 + "刷新"按钮
+- 可选筛选栏（属性定义/商品/属性值需要先选品类或商品才能展示数据）
+- 数据展示区（品类→树形结构，商品→卡片网格，属性定义/属性值→行内列表）
+- 行内悬浮操作按钮（每行 hover 时显示"编辑"和"删除"按钮）
+
+**右侧抽屉（Drawer）设计：**
+
+全局只有一个抽屉元素，通过 `drawerMode` 状态判断当前操作类型。11 种模式：
+
+| 模式 | 描述 |
+|------|------|
+| `cat-create` | 新增品类 |
+| `cat-edit` | 编辑品类 |
+| `cat-delete` | 删除品类（红色确认按钮） |
+| `ad-create` | 新增属性定义 |
+| `ad-edit` | 编辑属性定义 |
+| `ad-delete` | 删除属性定义 |
+| `prod-create` | 新增商品（含动态属性字段） |
+| `prod-edit` | 编辑商品（异步加载现有属性值） |
+| `prod-delete` | 删除商品 |
+| `val-create` | 新增属性值 |
+| `val-edit` | 编辑属性值 |
+
+删除操作不使用 `browser.confirm()`，而是在抽屉内展示警告文本 + 危险色"确认删除"按钮，样式更统一，可控性更强。
+
+#### 关键 JS 状态
+
+```javascript
+let currentModule = 'cat';          // 当前激活模块
+let drawerMode    = null;            // 当前抽屉模式
+let editingId     = null;            // 当前编辑/删除的记录 ID
+let currentAdCatId     = null;       // 属性定义模块：已选品类
+let currentValProdId   = null;       // 属性值模块：已选商品
+let currentProdCatFilter = null;     // 商品模块：当前筛选品类
+```
+
+#### 商品编辑的异步属性加载
+
+商品编辑抽屉需要加载该商品品类的属性定义列表 + 该商品已有的属性值，才能预填表单。
+
+策略：抽屉立即打开（即时反馈），然后异步加载属性数据，加载过程中显示 spinner：
+
+```javascript
+async function prodOpenEdit(id) {
+  openDrawer('prod-edit', prod);  // 立即打开
+  // 异步并发加载
+  const [defsRes, valsRes] = await Promise.all([...]);
+  _prodRenderAttrFields('dc-p-attrs-container', defs, existingMap);
+}
+```
+
+#### 品类选择器同步机制
+
+品类列表加载后（`catLoad`），自动同步更新以下下拉选择器：
+- `ad-filter-cat`：属性定义的品类筛选
+- `prod-filter-cat`：商品的品类筛选
+- `dc-c-category`：新增属性定义时的品类选择（如果抽屉已打开）
+- `dc-p-category`：新增商品时的品类选择（如果抽屉已打开）
+
+---
+
+### 14.2 接口权限：全局改为 IsAuthenticated
+
+#### 背景
+
+原配置（`settings.py`）：
+
+```python
+'DEFAULT_PERMISSION_CLASSES': (
+    'rest_framework.permissions.AllowAny',   # 开发阶段临时放开
+),
+```
+
+所有接口均不需要认证，存在安全风险。
+
+#### 改造方式
+
+**`weige/settings.py`** — 全局默认改为 `IsAuthenticated`：
+
+```python
+'DEFAULT_PERMISSION_CLASSES': (
+    'rest_framework.permissions.IsAuthenticated',
+),
+```
+
+**`app/user/views.py`** — 公开接口显式声明 `AllowAny`：
+
+```python
+@action(methods=['POST'], detail=False, url_path='login',
+        permission_classes=[AllowAny])
+def login(self, request): ...
+
+@action(methods=['POST'], detail=False, url_path='token/refresh',
+        permission_classes=[AllowAny])
+def token_refresh(self, request): ...
+```
+
+`me` 和 `create_user` 原本就已有显式 `permission_classes` 声明，不受影响。
+
+#### 接口权限总览
+
+| 接口 | 权限 | 说明 |
+|------|------|------|
+| `POST /api/users/login/` | AllowAny | 登录不需要 token |
+| `POST /api/users/token/refresh/` | AllowAny | token 刷新不需要认证 |
+| `GET /api/users/me/` | IsAuthenticated | 需要 Bearer token |
+| `POST /api/users/create/` | IsAuthenticated + IsAdminUser | 仅超级管理员 |
+| `GET /api/categories/dir/` | IsAuthenticated | 需要 Bearer token |
+| `POST /api/categories/create/` | IsAuthenticated | 需要 Bearer token |
+| `PATCH /api/categories/<id>/update/` | IsAuthenticated | 需要 Bearer token |
+| `DELETE /api/categories/<id>/delete/` | IsAuthenticated | 需要 Bearer token |
+| `GET /api/attr-defs/dir/` | IsAuthenticated | 需要 Bearer token |
+| `POST /api/attr-defs/create/` | IsAuthenticated | 需要 Bearer token |
+| `PATCH /api/attr-defs/<id>/update/` | IsAuthenticated | 需要 Bearer token |
+| `DELETE /api/attr-defs/<id>/delete/` | IsAuthenticated | 需要 Bearer token |
+| `GET /api/products/dir/` | IsAuthenticated | 需要 Bearer token |
+| `POST /api/products/create/` | IsAuthenticated | 需要 Bearer token |
+| `PATCH /api/products/<id>/update/` | IsAuthenticated | 需要 Bearer token |
+| `DELETE /api/products/<id>/delete/` | IsAuthenticated | 需要 Bearer token |
+| `GET /api/attr-values/dir/` | IsAuthenticated | 需要 Bearer token |
+| `POST /api/attr-values/create/` | IsAuthenticated | 需要 Bearer token |
+| `PATCH /api/attr-values/<id>/update/` | IsAuthenticated | 需要 Bearer token |
+
+Django 模板视图（`/login/`、`/dashboard/`）是普通 Django 视图，不经过 DRF 权限系统，不受影响。
+
+`POST /api/auth/login/`（`admin_views.py` 中的登录 API）已有 `@permission_classes([AllowAny])`，同样不受影响。
+
+---
+
+## 15. 2026-05-01 管理后台 UI 迭代
+
+> 在实际测试过程中对 dashboard.html 进行了多轮细节优化和结构调整。
+> 所有改动均在 `templates/dashboard.html` 中完成，后端无变更。
+
+---
+
+### 15.1 布局：整体居中 + 侧边栏加宽
+
+**问题：** 页面在宽屏下内容铺满全屏，视觉重心分散，中间内容区过空。
+
+**改造：**
+- 新增 `.page-wrap` 容器，`max-width: 1440px; margin: 0 auto`，将整个后台（topbar + 侧边栏 + 内容区）整体居中
+- `body` 改为 `display:flex; justify-content:center`，宽屏两侧露出背景色形成留白
+- 侧边栏宽度从 `220px` 扩大到 `260px`
+- 内容区 `padding: 32px 48px`，留出适当呼吸空间
+
+---
+
+### 15.2 品类树：替换 ID/父级显示 → 层级标签
+
+**问题：** 树形每行右侧显示数据库 ID 和父级名称，生产界面不需要这类调试信息。
+
+**改造：** 用彩色层级标签替代，利用 `_catRenderNodes` 已有的 `depth` 参数：
+
+| 层级 | 标签 | 颜色 |
+|------|------|------|
+| 0级（顶级）| `0级` | 紫色 |
+| 1级 | `1级` | 蓝色 |
+| 2级及以下 | `2级` | 绿色 |
+
+---
+
+### 15.3 属性定义：品类筛选只显示叶子品类
+
+**问题：** 新增属性定义只允许选末级品类，但筛选下拉却显示所有品类，逻辑不一致。
+
+**改造：** `_refreshCatSelects()` 中 `ad-filter-cat` 改用 `getLeafCategories()` 结果填充，与新增时保持统一。
+
+---
+
+### 15.4 属性值管理：重设计为属性槽位总览
+
+**问题：** 原设计将属性值当作独立记录管理（类似列表的增删改），逻辑割裂——用户无法直观看到"哪些属性还没填"。
+
+**核心认识：**
+- 一个叶子品类的属性定义是固定的「槽位」
+- 商品的所有属性值就是这些槽位的填写结果
+- 因此属性值管理的正确视角是：**以商品为中心，展示该品类所有属性槽位及其当前值**
+
+**改造后逻辑：**
+1. 选择商品 → 并发加载该品类所有属性定义 + 该商品已有属性值
+2. 合并展示完整槽位表：已填写的显示当前值 + 「编辑」按钮，未填写的显示「未填写」+ 「填写」按钮
+3. 右上角徽章显示 `已填 / 总数`
+4. 去掉「＋新增属性值」按钮（新增即填写某个空槽，从槽位行发起）
+
+---
+
+### 15.5 属性值管理并入商品管理（合并页签）
+
+**问题：** 「商品管理」和「属性值管理」是两个独立页签，但属性值本质上属于商品的一部分，来回切换不便。
+
+**改造方案：删除「属性值管理」侧边栏入口，并入「商品管理」**
+
+商品卡片 hover 时新增「属性值」按钮（原有「编辑」保留，专注基本信息）：
+
+```
+商品卡片（hover）
+  ├── [编辑信息]  → 抽屉：名称 / 价格 / 库存 / 图片
+  ├── [属性值]    → 宽抽屉（620px）：属性槽位总览表
+  └── [删除]      → 抽屉：逻辑删除确认
+```
+
+**属性值抽屉内的导航：**
+- 点「编辑」/「填写」→ 抽屉内切换为单个属性的编辑表单，顶部显示「← 返回属性总览」
+- 保存成功 → 自动刷新并返回属性总览，全程不离开当前商品上下文
+
+**技术实现要点：**
+- 新增抽屉模式 `prod-attrs`，打开时 `.drawer` 追加 `.wide` 类（620px）
+- 关闭抽屉时还原 `.wide` 类和隐藏的保存按钮
+- `_attrSlotEdit(valId)` / `_attrSlotFill(attrDefId)` 在抽屉内切换模式，不新开抽屉
+- `_attrSlotBack()` 重新调用 `openDrawer('prod-attrs', prod)` 刷新槽位表
+
+---
+
+### 15.6 Token 校验加强（登录页 + 后台）
+
+**问题：** 某些情况下 localStorage 中 `wg_token` 被存为字符串 `"undefined"`（而非 `null`），导致：
+- 登录页判断 `if (token)` 为真，直接跳转后台，用户无法重新登录（死循环）
+- 后台判断 `if (!token)` 为假，不跳转登录，但所有 API 请求均 401 失败
+
+**改造：**
+
+两处校验均加入有效性检查：
+```javascript
+// 有效 token 的判断条件
+token && token !== 'undefined' && token !== 'null' && token.length >= 20
+```
+
+`apiReq` / `apiMultipart` 增加 401 拦截，自动清除失效 token 并跳转登录页（1.5s 延迟 + toast 提示）。
+
+---
+
+### 15.7 下一阶段规划
+
+#### 优先级 1：前台商品展示页
+
+面向访客的公开页面，核心功能：
+- 商品列表页：按品类分类，卡片展示（图片/名称/价格）
+- 商品详情页：基本信息 + 动态属性展示
+- 路由设计：`/` 首页、`/category/<id>/` 品类页、`/product/<id>/` 详情页
+
+#### 优先级 2：按属性筛选
+
+前台核心差异化功能，基于 EAV 动态过滤：
+- 进入某品类后，左侧展示该品类所有属性定义作为筛选条件
+- 选择属性值后，过滤出符合条件的商品
+- 后端需新增支持多属性联合筛选的查询接口
+
+技术方案待定（考虑：多个属性值 AND 过滤 → JOIN attr_values 表多次，或子查询）
+
+#### 优先级 3：商品关键词搜索
+
+- 商品名称模糊搜索（`LIKE %keyword%` 或引入全文索引）
+- 可与属性筛选联动（先筛品类，再搜关键词）
+
+#### 优先级 4：图片存储优化
+
+- 当前：图片上传到 Django 本地 `media/` 目录
+- 规划：接入对象存储（阿里云 OSS / 腾讯云 COS），生产环境图片不存本地
+
+---
+
+### 15.8 品类删除保护：有商品时拒绝删除
+
+**背景：**
+`Product.category` 使用 `on_delete=PROTECT`，但逻辑删除（`is_delete=True`）不触发 Django 外键保护，品类下有商品时仍可被逻辑删除，会产生商品的品类字段指向已删除品类的数据问题。
+
+**决策：** 品类下存在未删除商品时，拒绝删除操作，返回明确错误提示，要求先处理商品。
+
+**改造（`app/category/views.py` → `delete_category`）：**
+
+```python
+# 拦截：品类下有商品时禁止删除
+product_count = Product.objects.filter(
+    category=category,
+    is_delete=DeleteStatus.NORMAL
+).count()
+if product_count:
+    return error_response(
+        message=f'该品类下还有 {product_count} 件商品，请先删除或迁移这些商品后再操作',
+        status_code=status.HTTP_400_BAD_REQUEST
+    )
+```
+
+错误信息中包含具体商品数量，便于用户判断处理量级。
+
+---
+
+### 15.9 品类树叶子节点商品数量徽章
+
+**需求：** 在品类树中一眼区分哪些叶子节点已有商品、哪些为空，便于管理员了解数据现状。
+
+**方案：**
+- 叶子节点有商品 → 绿色胶囊徽章 `📦 N 件`
+- 叶子节点无商品 → 灰色胶囊徽章 `空`
+- 非叶子节点（有子品类）→ 不显示徽章，保持简洁
+- 显示顺序：品类名 → 商品数徽章 → 层级标签 → 操作按钮
+
+**后端改造：**
+
+`app/category/views.py` — `dir_category` 新增 `annotate`：
+```python
+categories = Category.objects.filter(is_delete=DeleteStatus.NORMAL).annotate(
+    product_count=Count(
+        'products',                                      # 反向关联名（注意不是 'product'）
+        filter=Q(products__is_delete=DeleteStatus.NORMAL)
+    )
+)
+```
+
+`app/category/serializers.py` — `CategoryListSerializer` 新增字段：
+```python
+product_count = serializers.IntegerField(read_only=True, default=0)
+fields = ['id', 'category_name', 'parent_id', 'parent_name', 'create_time', 'product_count']
+```
+
+> ⚠️ **踩坑：** `Count('product', ...)` 报 `FieldError: Cannot resolve keyword 'product'`。
+> 正确的反向关联名是 `products`（由 `Product.category` 的 `related_name='products'` 决定），
+> `annotate` 中必须与 `related_name` 完全一致。
+
+**前端改造（`templates/dashboard.html` → `_catRenderNodes`）：**
+
+新增 CSS 类：
+```css
+.tr-prod-badge { font-size:10px; font-weight:600; padding:2px 8px; border-radius:10px; flex-shrink:0; }
+.tr-prod-has   { background:rgba(52,211,153,.15); color:var(--green); border:1px solid rgba(52,211,153,.35); }
+.tr-prod-empty { background:rgba(100,116,139,.1); color:var(--text3); border:1px solid rgba(100,116,139,.2); }
+```
+
+JS 渲染逻辑：
+```javascript
+const prodBadge = !has
+  ? (n.product_count > 0
+      ? `<span class="tr-prod-badge tr-prod-has">📦 ${n.product_count} 件</span>`
+      : `<span class="tr-prod-badge tr-prod-empty">空</span>`)
+  : '';
+```

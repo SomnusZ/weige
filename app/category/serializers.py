@@ -12,14 +12,16 @@ class CategoryListSerializer(serializers.ModelSerializer):
     parent_name 为动态计算字段，不存入数据库，始终与父级名称保持一致
     """
     # 动态计算父级名称，避免数据库冗余字段
-    parent_name = serializers.SerializerMethodField()
+    parent_name   = serializers.SerializerMethodField()
+    # 直属商品数量（由 view 层 annotate 注入，叶子节点专用）
+    product_count = serializers.IntegerField(read_only=True, default=0)
 
     def get_parent_name(self, obj):
         return obj.parent.category_name if obj.parent else None
 
     class Meta:
         model = Category
-        fields = ['id', 'category_name', 'parent_id', 'parent_name', 'create_time']
+        fields = ['id', 'category_name', 'parent_id', 'parent_name', 'create_time', 'product_count']
 
 
 class CategoryWriteSerializer(serializers.ModelSerializer):

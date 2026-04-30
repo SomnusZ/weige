@@ -1,9 +1,11 @@
 from rest_framework.viewsets import ViewSet
 from rest_framework.decorators import action
 from rest_framework import status
+from django.db.models import Count, Q
 
 from .models import Category
 from .serializers import CategoryListSerializer, CategoryWriteSerializer
+from app.product.models import Product
 from app.utils import success_response, error_response
 from app.dicts import DeleteStatus
 
@@ -26,8 +28,14 @@ class CategoryViewSet(ViewSet):
         """
         查询所有品类（平铺列表，前端负责组装树结构）
         GET /api/categories/dir/
+        附带每个品类下的直属商品数量（product_count），供前端标注叶子节点状态
         """
-        categories = Category.objects.filter(is_delete=DeleteStatus.NORMAL)
+        categories = Category.objects.filter(is_delete=DeleteStatus.NORMAL).annotate(
+            product_count=Count(
+                'products',
+                filter=Q(products__is_delete=DeleteStatus.NORMAL)
+            )
+        )
         serializer = CategoryListSerializer(categories, many=True)
         return success_response(data=serializer.data)
 
@@ -70,6 +78,17 @@ class CategoryViewSet(ViewSet):
         category = self.get_category_or_none(pk)
         if not category:
             return error_response(message="品类不存在或已被删除", status_code=status.HTTP_404_NOT_FOUND)
+
+        # 拦截：品类下有商品时禁止删除
+        product_count = Product.objects.filter(
+            category=category,
+            is_delete=DeleteStatus.NORMAL
+        ).count()
+        if product_count:
+            return error_response(
+                message=f'该品类下还有 {product_count} 件商品，请先删除或迁移这些商品后再操作',
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
 
         # 子品类上移：将直接子品类的父级改为当前品类的父级
         Category.objects.filter(

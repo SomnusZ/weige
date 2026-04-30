@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+from datetime import timedelta
 
 # 项目根目录（manage.py 所在目录）
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -44,9 +45,11 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',     # 静态文件管理
 
     # 第三方应用
-    'rest_framework',                 # Django REST Framework，提供接口序列化与字段限制
+    'rest_framework',                 # Django REST Framework
+    'rest_framework_simplejwt',       # JWT 认证
 
     # 业务模块（每个子模块作为独立 Django app 注册）
+    'app.user',                       # 用户模块（自定义 User，必须在其他 app 之前）
     'app.category',                   # 品类模块
     'app.category_attr_def',          # 品类属性定义模块
     'app.product',                    # 商品模块
@@ -166,6 +169,38 @@ MEDIA_URL = '/media/'
 
 # 媒体文件存储目录
 MEDIA_ROOT = BASE_DIR / 'media'
+
+
+# ==============================================================================
+# 自定义用户模型
+# ==============================================================================
+
+AUTH_USER_MODEL = 'user.User'
+
+
+# ==============================================================================
+# Django REST Framework 配置
+# ==============================================================================
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
+    'DEFAULT_PERMISSION_CLASSES': (
+        'rest_framework.permissions.IsAuthenticated',
+    ),
+}
+
+
+# ==============================================================================
+# SimpleJWT 配置
+# ==============================================================================
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME' : timedelta(hours=2),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    'AUTH_HEADER_TYPES'     : ('Bearer',),
+}
 
 
 # ==============================================================================

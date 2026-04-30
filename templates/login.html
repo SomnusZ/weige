@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>登录 · 威格管理后台</title>
+<style>
+:root {
+  --bg: #0f1117; --bg2: #1a1d27; --bg3: #22263a;
+  --border: #2e3250; --accent: #6c63ff; --accent2: #818cf8;
+  --green: #34d399; --red: #f87171;
+  --text: #e2e8f0; --text2: #94a3b8; --text3: #64748b;
+  --radius: 12px; --radius-sm: 8px; --shadow: 0 8px 40px rgba(0,0,0,0.5);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;
+  background: var(--bg); color: var(--text);
+  min-height: 100vh; display: flex; align-items: center; justify-content: center;
+}
+
+/* 背景装饰 */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background: radial-gradient(ellipse at 20% 30%, rgba(108,99,255,0.07) 0%, transparent 60%),
+              radial-gradient(ellipse at 80% 70%, rgba(129,140,248,0.05) 0%, transparent 50%);
+  pointer-events: none;
+}
+
+.login-wrap {
+  width: 100%; max-width: 400px; padding: 24px;
+  position: relative; z-index: 1;
+}
+
+.card {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 40px 36px;
+  box-shadow: var(--shadow);
+}
+
+/* Logo */
+.logo-area {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 14px; margin-bottom: 36px;
+}
+.logo-icon {
+  width: 56px; height: 56px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  border-radius: 16px; display: flex; align-items: center;
+  justify-content: center; font-size: 26px;
+  box-shadow: 0 4px 20px rgba(108,99,255,0.35);
+}
+.logo-title {
+  font-size: 20px; font-weight: 700; color: var(--text);
+  letter-spacing: 0.5px;
+}
+.logo-sub {
+  font-size: 12px; color: var(--text3); margin-top: -8px;
+}
+
+/* 表单 */
+.field { display: flex; flex-direction: column; gap: 7px; margin-bottom: 16px; }
+.field label { font-size: 12px; font-weight: 500; color: var(--text2); }
+.field input {
+  background: var(--bg3); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); color: var(--text);
+  font-size: 14px; padding: 12px 16px; outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s; font-family: inherit; width: 100%;
+}
+.field input:focus {
+  border-color: var(--accent); box-shadow: 0 0 0 3px rgba(108,99,255,0.15);
+}
+.field input::placeholder { color: var(--text3); }
+
+/* 错误提示 */
+.error-msg {
+  display: none; font-size: 12px; color: var(--red);
+  background: rgba(248,113,113,0.08); border: 1px solid rgba(248,113,113,0.2);
+  border-radius: var(--radius-sm); padding: 10px 14px; margin-bottom: 16px;
+  line-height: 1.5;
+}
+.error-msg.show { display: block; }
+
+/* 按钮 */
+.btn-login {
+  width: 100%; padding: 13px; border: none; border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, var(--accent), #5b52d8);
+  color: #fff; font-size: 14px; font-weight: 600;
+  cursor: pointer; transition: all 0.2s; margin-top: 8px;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+.btn-login:hover { transform: translateY(-1px); filter: brightness(1.1); box-shadow: 0 4px 20px rgba(108,99,255,0.4); }
+.btn-login:active { transform: translateY(0); }
+.btn-login:disabled { opacity: 0.65; cursor: not-allowed; transform: none; box-shadow: none; }
+
+.spinner {
+  width: 15px; height: 15px;
+  border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff;
+  border-radius: 50%; animation: spin 0.6s linear infinite; display: none;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* 底部提示 */
+.login-footer {
+  margin-top: 24px; text-align: center;
+  font-size: 12px; color: var(--text3); line-height: 1.8;
+}
+
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<div class="login-wrap">
+  <div class="card">
+    <div class="logo-area">
+      <div class="logo-icon">🏷</div>
+      <div>
+        <div class="logo-title">威格管理后台</div>
+        <div class="logo-sub">Weige Admin Dashboard</div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>用户名</label>
+      <input id="inp-username" type="text" placeholder="请输入用户名" autocomplete="username">
+    </div>
+    <div class="field">
+      <label>密码</label>
+      <input id="inp-password" type="password" placeholder="请输入密码" autocomplete="current-password">
+    </div>
+
+    <div class="error-msg" id="error-msg"></div>
+
+    <button class="btn-login" id="btn-login" onclick="doLogin()">
+      <span class="spinner" id="sp-login"></span>
+      登录
+    </button>
+
+    <div class="login-footer">
+      使用 Django 管理员账户登录<br>
+      如未创建账户，请运行 <code style="color:var(--accent2)">python manage.py createsuperuser</code>
+    </div>
+  </div>
+</div>
+
+<script>
+// 如果已有有效 token，直接跳转（防止字符串 "undefined" 被误判为有效 token）
+(function() {
+  const t = localStorage.getItem('wg_token');
+  if (t && t !== 'undefined' && t !== 'null' && t.length >= 20) {
+    window.location.href = '/dashboard/';
+  } else if (t) {
+    // 清除无效的旧 token，让用户重新登录
+    localStorage.removeItem('wg_token');
+    localStorage.removeItem('wg_user');
+    localStorage.removeItem('wg_refresh');
+  }
+})()
+
+// 回车触发登录
+document.getElementById('inp-username').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('inp-password').focus(); });
+document.getElementById('inp-password').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+
+async function doLogin() {
+  const username = document.getElementById('inp-username').value.trim();
+  const password = document.getElementById('inp-password').value;
+  const errEl    = document.getElementById('error-msg');
+  const btn      = document.getElementById('btn-login');
+  const sp       = document.getElementById('sp-login');
+
+  errEl.classList.remove('show');
+
+  if (!username || !password) {
+    showError('请填写用户名和密码');
+    return;
+  }
+
+  btn.disabled = true;
+  sp.style.display = 'inline-block';
+  btn.lastChild.textContent = ' 登录中...';
+
+  try {
+    const res  = await fetch('/api/auth/login/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      localStorage.setItem('wg_token',    data.data.access);
+      localStorage.setItem('wg_refresh',  data.data.refresh);
+      localStorage.setItem('wg_user',     JSON.stringify(data.data.user));
+      window.location.href = '/dashboard/';
+    } else {
+      showError(data.message || '登录失败，请检查用户名和密码');
+    }
+  } catch (e) {
+    showError('网络错误，请稍后重试');
+  } finally {
+    btn.disabled = false;
+    sp.style.display = 'none';
+    btn.lastChild.textContent = ' 登录';
+  }
+}
+
+function showError(msg) {
+  const el = document.getElementById('error-msg');
+  el.textContent = msg;
+  el.classList.add('show');
+}
+</script>
+</body>
+</html>
