@@ -1,12 +1,14 @@
 import json
 
 from django.db import transaction
+from django.db.models import Prefetch
 from rest_framework.viewsets import ViewSet
 from rest_framework.decorators import action
 from rest_framework import status
+from rest_framework.permissions import AllowAny
 
 from .models import Product
-from .serializers import ProductListSerializer, ProductCreateSerializer, ProductUpdateSerializer
+from .serializers import ProductListSerializer, ProductCreateSerializer, ProductUpdateSerializer, ProductPublicSerializer
 from app.category.models import Category
 from app.product_attr_value.models import ProductAttrValue
 from app.product_attr_value.serializers import (
@@ -115,6 +117,35 @@ class ProductViewSet(ViewSet):
             return Product.objects.get(id=pk, is_delete=DeleteStatus.NORMAL)
         except Product.DoesNotExist:
             return None
+
+    @action(methods=['GET'], detail=False, url_path='public', permission_classes=[AllowAny])
+    def public_list(self, request):
+        """
+        前台公开商品列表（无需登录）
+        GET /api/products/public/?category_id=<id>
+        返回商品基本信息 + 已填写的属性值列表，供前台展示页使用
+        """
+        av_qs = ProductAttrValue.objects.filter(
+            is_delete=DeleteStatus.NORMAL
+        ).select_related('attr_def').order_by('id')
+
+        queryset = (
+            Product.objects
+            .filter(is_delete=DeleteStatus.NORMAL)
+            .select_related('category')
+            .prefetch_related(Prefetch('attr_values', queryset=av_qs, to_attr='prefetched_attr_values'))
+        )
+
+        category_id = request.query_params.get('category_id')
+        if category_id:
+            try:
+                cat_ids = get_category_ids_with_descendants(int(category_id))
+                queryset = queryset.filter(category_id__in=cat_ids)
+            except (ValueError, TypeError):
+                pass
+
+        serializer = ProductPublicSerializer(queryset, many=True, context={'request': request})
+        return success_response(data=serializer.data)
 
     @action(methods=['GET'], detail=False, url_path='dir')
     def dir_product(self, request):

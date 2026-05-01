@@ -13,6 +13,9 @@ urlpatterns = [
     path('login/', admin_views.login_page, name='login'),
     path('dashboard/', admin_views.dashboard_page, name='dashboard'),
 
+    # 前台商品展示页（公开，无需登录）
+    path('products/', admin_views.products_page, name='products'),
+
 
     # 登录 API（返回 Token）
     path('api/auth/login/', admin_views.login_api, name='login-api'),

@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>威格 · 商品展示</title>
+<style>
+:root {
+  --bg:        #f2f3f5;
+  --card:      #ffffff;
+  --border:    #e8e8ec;
+  --header-bg: rgba(255,255,255,0.88);
+  --text:      #1a1a1a;
+  --text2:     #555;
+  --text3:     #999;
+  --accent:    #1a1a2e;
+  --shadow:    0 1px 6px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
+  --shadow-hv: 0 4px 20px rgba(0,0,0,0.13), 0 1px 4px rgba(0,0,0,0.04);
+  --radius:    14px;
+  --col-gap:   14px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'PingFang SC','Microsoft YaHei','Segoe UI',sans-serif;min-height:100vh;}
+
+/* ── Header ── */
+.header{
+  position:sticky;top:0;z-index:100;
+  background:var(--header-bg);
+  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border-bottom:1px solid var(--border);
+  padding:0 24px;
+  height:54px;display:flex;align-items:center;
+}
+.header-inner{
+  width:100%;max-width:1600px;margin:0 auto;
+  display:flex;align-items:center;gap:16px;
+}
+.logo{
+  font-size:20px;font-weight:800;letter-spacing:2px;color:var(--text);
+  text-decoration:none;user-select:none;
+}
+.logo em{font-style:normal;color:#c0392b;}
+.header-subtitle{
+  font-size:13px;color:var(--text3);font-weight:400;
+  padding-left:14px;border-left:1px solid var(--border);
+}
+.header-spacer{flex:1;}
+.header-count{font-size:12px;color:var(--text3);}
+
+/* ── Filter bar ── */
+.filter-wrap{
+  position:sticky;top:54px;z-index:99;
+  background:var(--card);
+  border-bottom:1px solid var(--border);
+  padding:0 24px;
+}
+.filter-inner{
+  width:100%;max-width:1600px;margin:0 auto;
+  display:flex;align-items:center;gap:6px;
+  overflow-x:auto;padding:10px 0;
+  scrollbar-width:none;
+}
+.filter-inner::-webkit-scrollbar{display:none;}
+.filter-sep{
+  width:1px;height:16px;background:var(--border);
+  flex-shrink:0;margin:0 4px;
+}
+.filter-chip{
+  flex-shrink:0;
+  padding:5px 14px;border-radius:20px;
+  border:1.5px solid var(--border);
+  background:#fff;color:var(--text2);
+  font-size:12px;font-family:inherit;
+  cursor:pointer;transition:all 0.15s;white-space:nowrap;
+  line-height:1.5;
+}
+.filter-chip:hover{border-color:#aaa;color:var(--text);}
+.filter-chip.active{
+  background:var(--accent);border-color:var(--accent);
+  color:#fff;font-weight:600;
+}
+.filter-chip.is-parent{font-weight:600;color:var(--text);}
+.filter-chip.is-parent.active{color:#fff;}
+
+/* ── Main ── */
+.main{
+  max-width:1600px;margin:0 auto;
+  padding:20px 24px 40px;
+}
+
+/* ── Masonry grid（JS 手动分列，彻底避免 CSS columns balance 空列问题） ── */
+.products-grid{
+  display:flex;
+  align-items:flex-start;
+  gap:var(--col-gap);
+}
+.masonry-col{
+  flex:0 1 300px;min-width:0;
+  display:flex;flex-direction:column;
+  gap:var(--col-gap);
+}
+@media(max-width:768px){
+  .main{padding:12px 12px 40px;}
+  .filter-wrap{padding:0 12px;}
+  .header{padding:0 12px;}
+  .header-subtitle{display:none;}
+}
+
+/* ── Product card ── */
+.product-card{
+  background:var(--card);
+  border-radius:var(--radius);
+  overflow:hidden;
+  /* margin-bottom 已移除：列间距由 .masonry-col { gap } 统一控制 */
+  box-shadow:var(--shadow);
+  transition:transform 0.2s ease, box-shadow 0.2s ease;
+  cursor:pointer;
+}
+.product-card:hover{
+  transform:translateY(-4px);
+  box-shadow:var(--shadow-hv);
+}
+.card-img-wrap{
+  width:100%;overflow:hidden;
+  background:#f0f0f2;
+}
+.card-img-wrap img{
+  width:100%;display:block;
+  object-fit:cover;
+  transition:transform 0.35s ease, opacity 0.3s;
+  opacity:0;
+}
+.card-img-wrap img.loaded{opacity:1;}
+.product-card:hover .card-img-wrap img{transform:scale(1.03);}
+.card-img-placeholder{
+  width:100%;aspect-ratio:3/4;
+  display:flex;align-items:center;justify-content:center;
+  font-size:40px;color:#d0d0d5;background:#f8f8fa;
+}
+.card-body{padding:11px 13px 14px;}
+.card-name{
+  font-size:13px;font-weight:500;color:var(--text);
+  line-height:1.55;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+  overflow:hidden;
+  word-break:break-all;
+}
+.card-cat{
+  margin-top:5px;
+  font-size:11px;color:var(--text3);
+  display:flex;align-items:center;gap:4px;
+}
+.card-cat::before{
+  content:'';display:inline-block;
+  width:5px;height:5px;border-radius:50%;
+  background:currentColor;opacity:.6;
+}
+.card-attrs{
+  margin-top:8px;
+  display:flex;flex-wrap:wrap;gap:4px;
+}
+.attr-tag{
+  font-size:11px;padding:2px 7px;
+  background:#f4f4f7;color:var(--text2);
+  border-radius:4px;border:1px solid #ebebef;
+  white-space:nowrap;max-width:120px;
+  overflow:hidden;text-overflow:ellipsis;
+}
+
+/* ── States ── */
+.state-box{
+  text-align:center;padding:80px 20px 120px;
+  color:var(--text3);
+}
+.state-box .s-icon{font-size:52px;margin-bottom:14px;opacity:.5;}
+.state-box .s-text{font-size:14px;line-height:1.8;}
+
+/* ── Skeleton loading ── */
+.skeleton-grid{columns:5;column-gap:var(--col-gap);}
+@media(max-width:1400px){.skeleton-grid{columns:4;}}
+@media(max-width:1100px){.skeleton-grid{columns:3;}}
+@media(max-width:768px){.skeleton-grid{columns:2;column-gap:10px;}}
+.sk-card{
+  break-inside:avoid;
+  background:var(--card);border-radius:var(--radius);
+  overflow:hidden;margin-bottom:var(--col-gap);box-shadow:var(--shadow);
+}
+.sk-img{width:100%;background:#edeef1;animation:skpulse 1.4s ease infinite;}
+.sk-line{
+  height:12px;border-radius:6px;background:#edeef1;
+  margin:8px 13px;animation:skpulse 1.4s ease infinite;
+}
+.sk-line.short{width:55%;margin-top:6px;}
+@keyframes skpulse{0%,100%{opacity:1;}50%{opacity:.45;}}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header class="header">
+  <div class="header-inner">
+    <a href="/products/" class="logo">威<em>格</em></a>
+    <span class="header-subtitle">商品展示</span>
+    <div class="header-spacer"></div>
+    <span class="header-count" id="header-count"></span>
+  </div>
+</header>
+
+<!-- Category filter bar -->
+<div class="filter-wrap">
+  <div class="filter-inner" id="filter-bar">
+    <button class="filter-chip active" data-id="">全部</button>
+  </div>
+</div>
+
+<!-- Main content -->
+<main class="main">
+  <div class="skeleton-grid" id="skeleton"></div>
+  <div class="products-grid" id="products-grid" style="display:none"></div>
+  <div class="state-box" id="state-box" style="display:none">
+    <div class="s-icon">🔍</div>
+    <div class="s-text">该品类暂无商品</div>
+  </div>
+</main>
+
+<script>
+const API_CATS  = '/api/categories/public/';
+const API_PRODS = '/api/products/public/';
+
+let activeCatId = '';
+let currentProducts = [];
+
+// ── 骨架屏 ──
+(function buildSkeleton(){
+  const heights = [220,280,180,240,300,200,260,190,250,210,230,170];
+  const sk = document.getElementById('skeleton');
+  sk.innerHTML = heights.map(h => `
+    <div class="sk-card">
+      <div class="sk-img" style="height:${h}px"></div>
+      <div style="padding:10px 13px 14px">
+        <div class="sk-line"></div>
+        <div class="sk-line short"></div>
+      </div>
+    </div>`).join('');
+})();
+
+// ── 初始化 ──
+(async function init(){
+  // "全部"按钮绑定事件
+  document.querySelector('.filter-chip[data-id=""]').addEventListener('click', () => setFilter(''));
+  await loadCategories();
+  await loadProducts();
+})();
+
+// ── 加载品类 ──
+async function loadCategories(){
+  try{
+    const res  = await fetch(API_CATS);
+    const json = await res.json();
+    if(json.success) renderFilterBar(json.data);
+  }catch(e){ console.error('品类加载失败', e); }
+}
+
+function renderFilterBar(cats){
+  const map = {}, roots = [];
+  cats.forEach(c => { map[c.id] = {...c, _children:[]}; });
+  cats.forEach(c => {
+    if(c.parent_id && map[c.parent_id]) map[c.parent_id]._children.push(map[c.id]);
+    else roots.push(map[c.id]);
+  });
+
+  const bar = document.getElementById('filter-bar');
+  function dfs(nodes, depth){
+    nodes.forEach(n => {
+      if(depth === 0){
+        const sep = document.createElement('span');
+        sep.className = 'filter-sep';
+        bar.appendChild(sep);
+      }
+      const btn = document.createElement('button');
+      btn.className = 'filter-chip' + (n._children.length ? ' is-parent' : '');
+      btn.dataset.id = n.id;
+      btn.textContent = n.category_name;
+      btn.addEventListener('click', () => setFilter(String(n.id)));
+      bar.appendChild(btn);
+      if(n._children.length) dfs(n._children, depth + 1);
+    });
+  }
+  dfs(roots, 0);
+}
+
+function setFilter(catId){
+  activeCatId = catId;
+  document.querySelectorAll('.filter-chip').forEach(b => {
+    b.classList.toggle('active', b.dataset.id === catId);
+  });
+  loadProducts();
+}
+
+// ── 当前视口的最大列数 ──
+function getMaxCols(){
+  const w = window.innerWidth;
+  if(w <= 768)  return 2;
+  if(w <= 1100) return 3;
+  if(w <= 1400) return 4;
+  return 5;
+}
+
+// ── JS Masonry：把商品按列数分配到各列 div ──
+function renderMasonry(products){
+  const grid = document.getElementById('products-grid');
+  grid.innerHTML = '';
+  if(!products.length) return;
+
+  const colCount = Math.min(products.length, getMaxCols());
+  // 创建列容器
+  const cols = Array.from({length: colCount}, () => {
+    const div = document.createElement('div');
+    div.className = 'masonry-col';
+    grid.appendChild(div);
+    return div;
+  });
+  // 轮询分配
+  products.forEach((p, i) => {
+    cols[i % colCount].insertAdjacentHTML('beforeend', renderCard(p));
+  });
+  lazyLoadImages();
+}
+
+// ── 加载商品 ──
+async function loadProducts(){
+  const grid     = document.getElementById('products-grid');
+  const skeleton = document.getElementById('skeleton');
+  const stateBox = document.getElementById('state-box');
+  const countEl  = document.getElementById('header-count');
+
+  grid.style.display     = 'none';
+  skeleton.style.display = '';
+  stateBox.style.display = 'none';
+  grid.innerHTML         = '';
+  countEl.textContent    = '';
+
+  const url = activeCatId ? `${API_PRODS}?category_id=${activeCatId}` : API_PRODS;
+
+  try{
+    const res  = await fetch(url);
+    const json = await res.json();
+    skeleton.style.display = 'none';
+
+    if(json.success && json.data.length > 0){
+      currentProducts = json.data;
+      grid.style.display = '';
+      renderMasonry(currentProducts);
+      countEl.textContent = `共 ${json.data.length} 件商品`;
+    } else {
+      currentProducts = [];
+      stateBox.style.display = '';
+    }
+  }catch(e){
+    skeleton.style.display = 'none';
+    stateBox.style.display = '';
+    console.error('商品加载失败', e);
+  }
+}
+
+// ── 渲染单张卡片 ──
+function renderCard(p){
+  const imgHtml = p.product_image_url
+    ? `<img data-src="${p.product_image_url}" alt="${escHtml(p.product_name)}">`
+    : `<div class="card-img-placeholder">🏷️</div>`;
+
+  const attrHtml = (p.attrs || []).slice(0, 4).map(a =>
+    `<span class="attr-tag" title="${escHtml(a.name)}：${escHtml(a.value)}">${escHtml(a.name)}：${escHtml(a.value)}</span>`
+  ).join('');
+
+  return `
+<div class="product-card">
+  <div class="card-img-wrap">${imgHtml}</div>
+  <div class="card-body">
+    <div class="card-name">${escHtml(p.product_name)}</div>
+    <div class="card-cat">${escHtml(p.category_name || '')}</div>
+    ${attrHtml ? `<div class="card-attrs">${attrHtml}</div>` : ''}
+  </div>
+</div>`;
+}
+
+// ── 图片懒加载 ──
+function lazyLoadImages(){
+  if(!('IntersectionObserver' in window)){
+    document.querySelectorAll('.card-img-wrap img[data-src]').forEach(img => {
+      img.src = img.dataset.src;
+      img.addEventListener('load', () => img.classList.add('loaded'));
+    });
+    return;
+  }
+  const io = new IntersectionObserver((entries, obs) => {
+    entries.forEach(e => {
+      if(!e.isIntersecting) return;
+      const img = e.target;
+      img.src = img.dataset.src;
+      img.addEventListener('load', () => img.classList.add('loaded'), {once:true});
+      img.removeAttribute('data-src');
+      obs.unobserve(img);
+    });
+  }, {rootMargin:'200px'});
+  document.querySelectorAll('.card-img-wrap img[data-src]').forEach(img => io.observe(img));
+}
+
+// resize 时重新按新列数排布
+let _resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(_resizeTimer);
+  _resizeTimer = setTimeout(() => {
+    const grid = document.getElementById('products-grid');
+    if(grid.style.display === 'none' || !currentProducts.length) return;
+    renderMasonry(currentProducts);
+  }, 120);
+});
+
+function escHtml(s){
+  return String(s)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>

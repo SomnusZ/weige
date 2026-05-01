@@ -1,6 +1,7 @@
 from rest_framework.viewsets import ViewSet
 from rest_framework.decorators import action
 from rest_framework import status
+from rest_framework.permissions import AllowAny
 from django.db.models import Count, Q
 
 from .models import Category
@@ -22,6 +23,18 @@ class CategoryViewSet(ViewSet):
             return Category.objects.get(id=pk, is_delete=DeleteStatus.NORMAL)
         except Category.DoesNotExist:
             return None
+
+    @action(methods=['GET'], detail=False, url_path='public', permission_classes=[AllowAny])
+    def public_categories(self, request):
+        """
+        前台公开品类列表（无需登录）
+        GET /api/categories/public/
+        返回所有层级品类的 id / name / parent_id，前端自行组装树结构
+        """
+        cats = Category.objects.filter(
+            is_delete=DeleteStatus.NORMAL
+        ).values('id', 'category_name', 'parent_id').order_by('id')
+        return success_response(data=list(cats))
 
     @action(methods=['GET'], detail=False, url_path='dir')
     def dir_category(self, request):

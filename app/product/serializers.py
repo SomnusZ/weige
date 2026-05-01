@@ -80,3 +80,43 @@ class ProductListSerializer(serializers.ModelSerializer):
         model = Product
         fields = ['id', 'product_name', 'category_id', 'product_price',
                   'product_image', 'product_stock', 'create_time']
+
+
+class ProductPublicSerializer(serializers.ModelSerializer):
+    """
+    前台商品公开序列化器
+    用于前台商品列表页（无需登录），附带品类名称和属性值列表
+    """
+    category_name     = serializers.CharField(source='category.category_name', read_only=True)
+    product_image_url = serializers.SerializerMethodField()
+    attrs             = serializers.SerializerMethodField()
+
+    def get_product_image_url(self, obj):
+        if not obj.product_image:
+            return None
+        request = self.context.get('request')
+        url = obj.product_image.url
+        return request.build_absolute_uri(url) if request else url
+
+    def get_attrs(self, obj):
+        result = []
+        for av in obj.prefetched_attr_values:   # 由 view 层 prefetch_related 注入
+            vtype = av.attr_def.value_type
+            if vtype == 'str':
+                val = av.value_str
+            elif vtype == 'int':
+                val = str(av.value_int) if av.value_int is not None else None
+            elif vtype == 'float':
+                val = str(av.value_float) if av.value_float is not None else None
+            elif vtype == 'bool':
+                val = '是' if av.value_bool else '否'
+            else:
+                val = None
+            if val is not None:
+                result.append({'name': av.attr_def.attr_name, 'value': val})
+        return result
+
+    class Meta:
+        model  = Product
+        fields = ['id', 'product_name', 'category_id', 'category_name',
+                  'product_image_url', 'attrs']

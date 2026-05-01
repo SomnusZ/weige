@@ -17,6 +17,10 @@ def dashboard_page(request):
     return render(request, 'dashboard.html')
 
 
+def products_page(request):
+    return render(request, 'products.html')
+
+
 
 
 @api_view(['POST'])

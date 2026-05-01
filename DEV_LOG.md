@@ -23,6 +23,7 @@
 13. [2026-04-27 用户认证与管理后台](#13-2026-04-27-用户认证与管理后台)
 14. [2026-04-30 管理后台重设计 + 接口权限](#14-2026-04-30-管理后台重设计--接口权限)
 15. [2026-05-01 管理后台 UI 迭代](#15-2026-05-01-管理后台-ui-迭代)
+16. [2026-05-01 前台商品展示页](#16-2026-05-01-前台商品展示页)（含 16.9 瀑布流 CSS columns → JS flex masonry 迁移）
 
 ---
 
@@ -680,6 +681,18 @@ DELETE /api/categories/<id>/delete/
 
 ---
 
+#### GET 公开品类列表（AllowAny）
+
+```
+GET /api/categories/public/
+
+入参：无
+出参：所有层级品类的 id / category_name / parent_id，前端组装树结构
+权限：无需登录
+```
+
+---
+
 ### 7.2 CategoryAttrDef 品类属性定义接口
 
 #### GET 查询指定品类的属性定义
@@ -761,6 +774,31 @@ GET /api/products/dir/?category_id=<id>    // 可按品类筛选
       "product_image": "products/img.jpg",
       "product_stock": 100,
       "create_time": "..."
+    }
+  ]
+}
+```
+
+#### GET 前台公开商品列表（AllowAny）
+
+```
+GET /api/products/public/
+GET /api/products/public/?category_id=<id>    // 按品类筛选（含所有子孙品类）
+
+权限：无需登录
+出参：
+{
+  "data": [
+    {
+      "id": 5,
+      "product_name": "经典羊毛大衣",
+      "category_id": 11,
+      "category_name": "大衣",
+      "product_image_url": "http://.../media/products/xxx.jpg",  // null 表示无图片
+      "attrs": [
+        { "name": "颜色", "value": "驼色" },
+        { "name": "材质", "value": "羊毛" }
+      ]
     }
   ]
 }
@@ -1032,7 +1070,8 @@ Category.objects.filter(category_name=name, is_delete=DeleteStatus.NORMAL)
 
 ### 中期任务（优先级从高到低）
 
-- [ ] **前台商品展示页**（仿 1688 商品列表 + 详情页，面向访客）
+- [x] ~~**前台商品展示页（列表）**~~（2026-05-01 完成，详见第 16 章）
+- [ ] **前台商品详情页** `/products/<id>/`（待开发）
 - [ ] **按品类属性筛选商品**（前台核心功能，基于 EAV 动态过滤）
 - [ ] **商品关键词搜索**（商品名称模糊搜索）
 - [ ] 图片存储优化（当前存本地，考虑接入对象存储）
@@ -1466,7 +1505,7 @@ REST_FRAMEWORK = {
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': (
-        'rest_framework.permissions.AllowAny',   # 开发阶段全部公开
+        'rest_framework.permissions.AllowAny',   # ⚠️ 初始配置，已于 2026-04-30 改为 IsAuthenticated（见第 14 章）
     ),
 }
 
@@ -1743,6 +1782,8 @@ def token_refresh(self, request): ...
 | `POST /api/attr-defs/create/` | IsAuthenticated | 需要 Bearer token |
 | `PATCH /api/attr-defs/<id>/update/` | IsAuthenticated | 需要 Bearer token |
 | `DELETE /api/attr-defs/<id>/delete/` | IsAuthenticated | 需要 Bearer token |
+| `GET /api/categories/public/` | AllowAny | 前台公开接口，无需 token |
+| `GET /api/products/public/` | AllowAny | 前台公开接口，无需 token |
 | `GET /api/products/dir/` | IsAuthenticated | 需要 Bearer token |
 | `POST /api/products/create/` | IsAuthenticated | 需要 Bearer token |
 | `PATCH /api/products/<id>/update/` | IsAuthenticated | 需要 Bearer token |
@@ -1862,12 +1903,10 @@ token && token !== 'undefined' && token !== 'null' && token.length >= 20
 
 ### 15.7 下一阶段规划
 
-#### 优先级 1：前台商品展示页
+#### ~~优先级 1：前台商品展示页~~（2026-05-01 已完成，详见第 16 章）
 
-面向访客的公开页面，核心功能：
-- 商品列表页：按品类分类，卡片展示（图片/名称/价格）
-- 商品详情页：基本信息 + 动态属性展示
-- 路由设计：`/` 首页、`/category/<id>/` 品类页、`/product/<id>/` 详情页
+- [x] 商品列表页：瀑布流卡片展示，品类筛选，属性值展示
+- [ ] 商品详情页：点击卡片进入，展示完整属性（待开发）
 
 #### 优先级 2：按属性筛选
 
@@ -1965,3 +2004,296 @@ const prodBadge = !has
       : `<span class="tr-prod-badge tr-prod-empty">空</span>`)
   : '';
 ```
+
+---
+
+## 16. 2026-05-01 前台商品展示页
+
+> 完成面向访客的公开商品列表页，无需登录即可访问。
+> 涉及文件：`templates/products.html`（新增）、`app/product/serializers.py`、
+> `app/product/views.py`、`app/category/views.py`、`app/admin_views.py`、`weige/urls.py`
+
+---
+
+### 16.1 整体设计
+
+**风格定位：** 白色系简约风 + 小红书瀑布流错落感，参考 1688 信息密度。
+
+**页面结构：**
+```
+┌─────────────────────────────────────────────┐
+│  威格  |  商品展示                 共 N 件商品 │  sticky 顶栏
+├─────────────────────────────────────────────┤
+│  全部 | 衣服  大衣  风衣  毛衣… | 裤子… | 鞋子… │  sticky 品类筛选栏
+├─────────────────────────────────────────────┤
+│  [card] [card] [card] [card] [card]          │
+│  [card]        [card]        [card]          │  JS flex masonry（16.9）
+│         [card]        [card]                 │
+└─────────────────────────────────────────────┘
+```
+
+**响应式列数：**
+
+| 屏幕宽度 | 列数 |
+|---------|------|
+| > 1400px | 5 列 |
+| 1100–1400px | 4 列 |
+| 768–1100px | 3 列 |
+| < 768px | 2 列 |
+
+**布局技术：** JS flex masonry（详见 16.9）。N 个 `.masonry-col` 弹性列容器，轮询分配商品，彻底解决 CSS columns 空列问题。
+
+---
+
+### 16.2 公开 API 接口（AllowAny）
+
+原有管理接口均需 `IsAuthenticated`，前台页面新增两个公开接口：
+
+#### GET /api/categories/public/
+返回所有层级品类，供前端自行组装树结构：
+```json
+{
+  "data": [
+    { "id": 1, "category_name": "衣服", "parent_id": null },
+    { "id": 11, "category_name": "大衣", "parent_id": 1 }
+  ]
+}
+```
+
+#### GET /api/products/public/?category_id=\<id\>
+返回商品列表，附带属性值，无需登录：
+```json
+{
+  "data": [
+    {
+      "id": 5,
+      "product_name": "经典羊毛大衣",
+      "category_id": 11,
+      "category_name": "大衣",
+      "product_image_url": "http://127.0.0.1:8000/media/products/xxx.jpg",
+      "attrs": [
+        { "name": "颜色", "value": "驼色" },
+        { "name": "材质", "value": "羊毛" },
+        { "name": "型号", "value": "M" },
+        { "name": "产地", "value": "浙江杭州" }
+      ]
+    }
+  ]
+}
+```
+
+`category_id` 可选，传入任意层级品类 ID，后端递归查询所有子孙品类的商品（复用 `get_category_ids_with_descendants`）。
+
+---
+
+### 16.3 ProductPublicSerializer 设计
+
+```python
+class ProductPublicSerializer(serializers.ModelSerializer):
+    category_name     = serializers.CharField(source='category.category_name', read_only=True)
+    product_image_url = serializers.SerializerMethodField()
+    attrs             = serializers.SerializerMethodField()
+
+    def get_product_image_url(self, obj):
+        if not obj.product_image: return None
+        url = obj.product_image.url
+        request = self.context.get('request')
+        return request.build_absolute_uri(url) if request else url
+
+    def get_attrs(self, obj):
+        # obj.prefetched_attr_values 由 view 层 Prefetch 注入，避免 N+1
+        result = []
+        for av in obj.prefetched_attr_values:
+            vtype = av.attr_def.value_type
+            val = {
+                'str':   av.value_str,
+                'int':   str(av.value_int)   if av.value_int   is not None else None,
+                'float': str(av.value_float) if av.value_float is not None else None,
+                'bool':  '是' if av.value_bool else '否',
+            }.get(vtype)
+            if val is not None:
+                result.append({'name': av.attr_def.attr_name, 'value': val})
+        return result
+```
+
+**N+1 优化：** view 层使用 `Prefetch` 预加载属性值，避免每个商品单独查询：
+
+```python
+av_qs = ProductAttrValue.objects.filter(
+    is_delete=DeleteStatus.NORMAL
+).select_related('attr_def').order_by('id')
+
+queryset = (
+    Product.objects
+    .filter(is_delete=DeleteStatus.NORMAL)
+    .select_related('category')
+    .prefetch_related(Prefetch('attr_values', queryset=av_qs, to_attr='prefetched_attr_values'))
+)
+```
+
+---
+
+### 16.4 前台页面技术细节
+
+#### 品类筛选栏
+
+- 前端从 `/api/categories/public/` 获取全量品类，在客户端组装树结构
+- DFS 遍历后平铺为水平 chip 列表，父级品类加粗显示
+- 相邻根节点之间用 1px 竖线分隔，视觉分组
+- 点击任意层级品类（包括父级）均触发筛选，后端负责递归匹配子孙商品
+
+#### 图片懒加载
+
+使用 `IntersectionObserver`，进入视口前 200px 时开始加载：
+```javascript
+const io = new IntersectionObserver((entries, obs) => {
+  entries.forEach(e => {
+    if (!e.isIntersecting) return;
+    const img = e.target;
+    img.src = img.dataset.src;
+    img.addEventListener('load', () => img.classList.add('loaded'), { once: true });
+    obs.unobserve(img);
+  });
+}, { rootMargin: '200px' });
+```
+图片加载完成后 `opacity: 0 → 1` 渐显，降级方案：旧浏览器直接赋值 `src`。
+
+#### 骨架屏
+
+页面加载时立即渲染 12 张高度各异的灰色骨架卡片（`animation: skpulse` 呼吸动画），数据返回后替换为真实内容，避免白屏闪烁。
+
+#### 无图片占位
+
+商品未上传图片时，显示 `🏷️` emoji + 3:4 比例灰色背景占位块，保持卡片结构一致。
+
+---
+
+### 16.5 踩坑：静态"全部"按钮无点击事件（已修复）
+
+**问题：** "全部" chip 是写在 HTML 里的静态元素，其他品类 chip 由 JS `renderFilterBar()` 动态创建并绑定 `addEventListener`。静态元素没有绑定，导致点击"全部"后无法切回全量展示。
+
+**修复：** 在 `init()` 中显式绑定：
+```javascript
+document.querySelector('.filter-chip[data-id=""]')
+  .addEventListener('click', () => setFilter(''));
+```
+
+---
+
+### 16.6 移动端适配情况
+
+| 页面 | 移动端 | 说明 |
+|------|--------|------|
+| `/products/` | ✅ 已适配 | 2列瀑布流，filter bar 横向滚动 |
+| `/login/` | ✅ 基本适配 | max-width 卡片居中 |
+| `/dashboard/` | ❌ 仅桌面 | 固定侧边栏，管理员用 PC 操作，暂不改造 |
+
+---
+
+### 16.7 测试数据
+
+使用 Django ORM 脚本分批插入，共 **31 条**商品：
+
+**第一批（10 条）：大衣 + 板鞋**
+
+| 品类 | 商品 | 属性 |
+|------|------|------|
+| 大衣 | 经典羊毛大衣 | 颜色:驼色 材质:羊毛 型号:M 产地:浙江杭州 |
+| 大衣 | 修身双面呢大衣 | 颜色:黑色 材质:羊绒混纺 型号:L 产地:广东深圳 |
+| 大衣 | 宽松落肩大衣 | 颜色:米白 材质:涤纶混纺 型号:XL 产地:江苏苏州 |
+| 大衣 | 双排扣赫本大衣 | 颜色:深灰 材质:羊毛混纺 型号:S 产地:浙江宁波 |
+| 大衣 | 长款廓形大衣 | 颜色:藏青 材质:精纺羊毛 型号:XXL 产地:北京 |
+| 板鞋 | 复古纯白板鞋 | 颜色:纯白 尺码:42 |
+| 板鞋 | 黑白拼色板鞋 | 颜色:黑白 尺码:40 |
+| 板鞋 | 厚底增高板鞋 | 颜色:米白 尺码:38 |
+| 板鞋 | 低帮休闲板鞋 | 颜色:深灰 尺码:43 |
+| 板鞋 | 联名款潮流板鞋 | 颜色:天蓝 尺码:41 |
+
+**第二批（21 条）：其余 7 个空叶子品类，各 3 条**
+
+| 品类 | 自定义属性 | 代表商品 |
+|------|-----------|---------|
+| 风衣 | 颜色、腰带款式、衣长 | 经典卡其风衣 / 宽松落肩风衣 / 双排扣军旅风衣 |
+| 高领毛衣 | 颜色、材质、版型 | 纯色高领针织毛衣 / 条纹宽松高领衫 / 毛圈高领套头毛衣 |
+| V领毛衣 | 颜色、材质、尺码 | V领麻花毛衣 / 宽松V领毛衣 / 轻薄V领针织衫 |
+| 牛仔裤 | 颜色、版型、腰围 | 修身小脚牛仔裤 / 宽松直筒牛仔裤 / 破洞磨白牛仔裤 |
+| 运动裤 | 颜色、面料、腰围 | 束脚运动长裤 / 宽松卫裤 / 速干运动短裤 |
+| 秋裤 | 颜色、材质、腰围 | 加绒厚款秋裤 / 莫代尔薄款秋裤 / 纯棉打底秋裤 |
+| 帆布鞋 | 颜色、鞋底类型、尺码 | 低帮经典帆布鞋 / 高帮街头帆布鞋 / 格纹印花帆布鞋 |
+
+---
+
+### 16.8 下一阶段规划（更新）
+
+| 优先级 | 功能 | 状态 |
+|--------|------|------|
+| 1 | 商品详情页 `/products/<id>/` | ⬜ 待开发 |
+| 2 | 按品类属性动态筛选 | ⬜ 待开发 |
+| 3 | 商品关键词搜索 | ⬜ 待开发 |
+| 4 | 商品图片上传与展示 | ⬜ 待上传测试图 |
+| 5 | 图片存储优化（OSS） | ⬜ 生产环境再做 |
+
+---
+
+### 16.9 踩坑：CSS columns 空列问题 → JS flex masonry
+
+**问题现象：**
+商品数少于最大列数时（如 3 件商品、最大 5 列），右侧出现 2 个空白区域，卡片宽度异常膨胀。
+
+**根本原因：**
+CSS `column-fill: balance`（浏览器默认值）会主动**减少实际使用的列数**以让各列高度尽量均衡。
+即使显式设置 `column-count: 5`，浏览器也可能决定只用 3 列（每列放 2 张卡片），剩余 2 列仍然占据各自宽度份额，表现为右侧大片空白。
+
+**尝试过的无效方案：**
+- 动态设置 `grid.style.columnCount = Math.min(productCount, maxCols)` — 无效，balance 算法仍然减少列数
+- 添加 `column-fill: auto` — 改变填充顺序但不解决空列问题
+
+**最终方案：放弃 CSS columns，改用 JS flex masonry**
+
+```css
+.products-grid {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--col-gap);
+}
+.masonry-col {
+  flex: 0 1 300px;   /* 不随商品数拉伸，保持正常卡片宽度 */
+  min-width: 0;
+  display: flex; flex-direction: column;
+  gap: var(--col-gap);
+}
+```
+
+```javascript
+function renderMasonry(products) {
+  const grid = document.getElementById('products-grid');
+  grid.innerHTML = '';
+  if (!products.length) return;
+
+  const colCount = Math.min(products.length, getMaxCols());
+  const cols = Array.from({ length: colCount }, () => {
+    const div = document.createElement('div');
+    div.className = 'masonry-col';
+    grid.appendChild(div);
+    return div;
+  });
+  // 轮询分配：第 i 件商品放第 i % colCount 列
+  products.forEach((p, i) => {
+    cols[i % colCount].insertAdjacentHTML('beforeend', renderCard(p));
+  });
+  lazyLoadImages();
+}
+```
+
+**额外问题：商品数极少时卡片过宽**
+
+只有 3 件商品时，3 列各占 `flex: 1` → 1/3 全宽（约 500px），卡片过大。
+
+**修复：** 将 `.masonry-col` 改为 `flex: 0 1 300px`：
+- 商品充足（≥ maxCols）：多列同时 `flex-shrink` 收缩，均匀铺满 ✓
+- 商品极少（< maxCols）：各列保持 ≈ 300px 正常宽度，左对齐，右侧自然留白 ✓
+- 手机端（2 列）：两列各收缩至约 50% 屏宽，正常显示 ✓
+
+**resize 响应：** 防抖 120ms 后调用 `renderMasonry(currentProducts)` 重建列布局，应对横竖屏切换和窗口拖拽。
+
+**遗留清理：** 迁移后同步移除了 `.product-card` 的 `margin-bottom: var(--col-gap)`（CSS columns 时代的遗留），卡片间距现在完全由 `.masonry-col { gap }` 统一控制，避免双倍间距。骨架屏（`.skeleton-grid`）仍保留 CSS `columns`，属于临时加载动画，不是真实内容布局，无需迁移。
