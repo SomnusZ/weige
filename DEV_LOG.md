@@ -2285,6 +2285,145 @@ function renderMasonry(products) {
 }
 ```
 
+---
+
+## 17. 2026-05-03 商品详情弹窗 + 关键词搜索
+
+> 在前台商品展示页基础上，新增仿小红书风格的商品详情弹窗，以及商品名称关键词搜索功能。
+> 涉及文件：`templates/products.html`、`app/product/serializers.py`、`app/product/views.py`
+
+---
+
+### 17.1 ProductPublicSerializer 补全价格与库存字段
+
+**背景：** 原 `ProductPublicSerializer` 仅返回名称、品类、图片、属性标签，未包含价格和库存。详情弹窗需要展示这两个字段。
+
+**改造（`app/product/serializers.py`）：**
+
+```python
+class Meta:
+    model  = Product
+    fields = ['id', 'product_name', 'category_id', 'category_name',
+              'product_price', 'product_stock', 'product_image_url', 'attrs']
+```
+
+`product_price` 和 `product_stock` 是 `Product` 模型的直接字段，DRF 自动序列化，无需额外 `SerializerMethodField`。
+
+---
+
+### 17.2 商品详情弹窗 Modal（`templates/products.html`）
+
+**设计方案：** 仿小红书卡片弹窗，点击任意商品卡片直接展开，不跳转新页面。
+
+**布局结构：**
+```
+┌──────────────────────────────────────────┐
+│ [✕]                                      │  ← 右上角关闭按钮
+│  ┌──────────────────┬───────────────────┐ │
+│  │                  │  品类名称          │ │
+│  │   商品图片        │  商品名称          │ │
+│  │   (左侧 50%)     │  ¥ 价格           │ │
+│  │                  │  库存 N 件         │ │
+│  │                  │  ─────────────    │ │
+│  │                  │  规格参数          │ │
+│  │                  │  颜色 | 驼色       │ │
+│  │                  │  材质 | 羊毛       │ │
+│  └──────────────────┴───────────────────┘ │
+└──────────────────────────────────────────┘
+```
+
+**关闭方式：**
+- 点击右上角 ✕ 按钮
+- 点击遮罩层空白区域
+- 按 `Esc` 键
+
+**数据来源：** 点击卡片时直接从已加载的 `currentProducts` 数组中查找，无需发起新的 API 请求，响应即时。
+
+**关键实现：**
+
+`renderCard(p)` 中卡片加 `onclick`：
+```javascript
+<div class="product-card" onclick="openModal(${p.id})">
+```
+
+`openModal(productId)` 函数：
+```javascript
+function openModal(productId) {
+  const p = currentProducts.find(x => x.id === productId);
+  if (!p) return;
+  // 渲染图片 + 信息
+  document.getElementById('modal-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';   // 禁止背景滚动
+}
+```
+
+**移动端适配：** 屏幕宽度 ≤ 680px 时，弹窗改为上图下文的竖向布局，图片固定 240px 高，信息区可滚动。
+
+---
+
+### 17.3 关键词搜索
+
+#### 后端（`app/product/views.py` → `public_list`）
+
+`public_list` 接口新增 `?q=` 参数，支持商品名称模糊搜索：
+
+```python
+# 商品名称关键词搜索
+keyword = request.query_params.get('q', '').strip()
+if keyword:
+    queryset = queryset.filter(product_name__icontains=keyword)
+```
+
+- `icontains`：大小写不敏感的模糊匹配（`SQL LIKE %keyword%`）
+- `strip()`：自动去除首尾空格
+- 与 `category_id` 可叠加：先筛品类，再搜关键词
+
+完整接口签名：
+```
+GET /api/products/public/?category_id=<id>&q=<keyword>
+```
+
+#### 前端（`templates/products.html`）
+
+Header 新增搜索框（胶囊样式，与品牌 logo 同行）：
+
+```html
+<div class="search-wrap">
+  <input id="search-input" type="text" class="search-input" placeholder="搜索商品名称…">
+  <button class="search-btn" onclick="doSearch()">搜索</button>
+</div>
+```
+
+JS 状态管理：新增 `activeKeyword` 变量，与 `activeCatId` 互相独立、可叠加：
+
+```javascript
+let activeCatId   = '';
+let activeKeyword = '';
+
+function doSearch() {
+  activeKeyword = document.getElementById('search-input').value.trim();
+  loadProducts();
+}
+
+// loadProducts 中
+const params = new URLSearchParams();
+if (activeCatId)   params.set('category_id', activeCatId);
+if (activeKeyword) params.set('q', activeKeyword);
+```
+
+支持 `Enter` 键触发搜索，搜索与品类筛选可同时生效。
+
+---
+
+### 17.4 未完成计划（更新）
+
+| 优先级 | 功能 | 状态 |
+|--------|------|------|
+| 1 | 商品详情弹窗 Modal | ✅ 2026-05-03 完成 |
+| 2 | 商品关键词搜索 | ✅ 2026-05-03 完成 |
+| 3 | 按品类属性动态筛选 | ⬜ 待开发 |
+| 4 | 图片存储优化（OSS） | ⬜ 生产环境再做 |
+
 **额外问题：商品数极少时卡片过宽**
 
 只有 3 件商品时，3 列各占 `flex: 1` → 1/3 全宽（约 500px），卡片过大。

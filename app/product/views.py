@@ -122,7 +122,9 @@ class ProductViewSet(ViewSet):
     def public_list(self, request):
         """
         前台公开商品列表（无需登录）
-        GET /api/products/public/?category_id=<id>
+        GET /api/products/public/?category_id=<id>&q=<keyword>
+          category_id — 按品类筛选（含子孙品类），可选
+          q           — 商品名称关键词搜索（模糊匹配），可选
         返回商品基本信息 + 已填写的属性值列表，供前台展示页使用
         """
         av_qs = ProductAttrValue.objects.filter(
@@ -136,6 +138,7 @@ class ProductViewSet(ViewSet):
             .prefetch_related(Prefetch('attr_values', queryset=av_qs, to_attr='prefetched_attr_values'))
         )
 
+        # 品类筛选（含所有子孙品类）
         category_id = request.query_params.get('category_id')
         if category_id:
             try:
@@ -143,6 +146,11 @@ class ProductViewSet(ViewSet):
                 queryset = queryset.filter(category_id__in=cat_ids)
             except (ValueError, TypeError):
                 pass
+
+        # 商品名称关键词搜索
+        keyword = request.query_params.get('q', '').strip()
+        if keyword:
+            queryset = queryset.filter(product_name__icontains=keyword)
 
         serializer = ProductPublicSerializer(queryset, many=True, context={'request': request})
         return success_response(data=serializer.data)
