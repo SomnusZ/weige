@@ -24,6 +24,8 @@
 14. [2026-04-30 管理后台重设计 + 接口权限](#14-2026-04-30-管理后台重设计--接口权限)
 15. [2026-05-01 管理后台 UI 迭代](#15-2026-05-01-管理后台-ui-迭代)
 16. [2026-05-01 前台商品展示页](#16-2026-05-01-前台商品展示页)（含 16.9 瀑布流 CSS columns → JS flex masonry 迁移）
+17. [2026-05-03 商品详情弹窗 + 关键词搜索](#17-2026-05-03-商品详情弹窗--关键词搜索)
+18. [2026-05-04 按属性动态筛选](#18-2026-05-04-按属性动态筛选)
 
 ---
 
@@ -2436,3 +2438,140 @@ if (activeKeyword) params.set('q', activeKeyword);
 **resize 响应：** 防抖 120ms 后调用 `renderMasonry(currentProducts)` 重建列布局，应对横竖屏切换和窗口拖拽。
 
 **遗留清理：** 迁移后同步移除了 `.product-card` 的 `margin-bottom: var(--col-gap)`（CSS columns 时代的遗留），卡片间距现在完全由 `.masonry-col { gap }` 统一控制，避免双倍间距。骨架屏（`.skeleton-grid`）仍保留 CSS `columns`，属于临时加载动画，不是真实内容布局，无需迁移。
+
+---
+
+## 18. 2026-05-04 按属性动态筛选
+
+### 18.1 功能目标
+
+前台商品展示页的核心差异化功能：用户选中某个叶子品类后，左侧动态出现该品类的属性筛选面板（仿 1688 风格），支持多选、跨属性 AND、同属性 OR 组合过滤。
+
+---
+
+### 18.2 后端：filter-options 接口
+
+**新增 action：**
+
+```python
+GET /api/products/filter-options/?category_id=<id>
+permission: AllowAny
+```
+
+**返回格式：**
+
+```json
+[
+  { "attr_def_id": 1, "attr_name": "颜色", "value_type": "str", "values": ["红色", "蓝色"] },
+  { "attr_def_id": 2, "attr_name": "尺码", "value_type": "str", "values": ["S", "M", "XL"] }
+]
+```
+
+**实现要点：**
+
+- 查询该品类下所有未删除的 `CategoryAttrDef`
+- 对每个属性定义，到 `ProductAttrValue` 中按 `distinct().order_by()` 查出实际存在的去重值
+- 过滤条件：`product__is_delete=NORMAL` + `attr_def=attr_def` + `field__isnull=False`
+- `bool` 类型特殊处理：将 `True/False` 转为 `"是"/"否"` 字符串，统一前端渲染
+- 若属性无任何商品数据，跳过该属性（不展示空选项）
+- 若未传 `category_id` 或参数非法，返回空列表
+
+---
+
+### 18.3 后端：public_list 支持属性筛选参数
+
+**接口扩展：**
+
+```
+GET /api/products/public/?category_id=<id>&q=<kw>&attr_1=红色&attr_1=蓝色&attr_2=XL
+```
+
+**参数规则：**
+
+| 参数 | 含义 |
+|------|------|
+| `attr_<id>` | 按属性定义 ID 筛选，`<id>` 为 `CategoryAttrDef.id` |
+| 同 key 多值 | OR 语义（颜色选红 OR 蓝） |
+| 不同 key | AND 语义（颜色 AND 尺码） |
+
+**实现逻辑：**
+
+```python
+# 解析所有 attr_<id> 参数
+for key in request.query_params:
+    if key.startswith('attr_'):
+        attr_def_id = int(key[5:])
+        values = request.query_params.getlist(key)   # 多值
+
+# 按 value_type 决定过滤字段
+field_name = ATTR_TYPE_FIELD_MAP.get(attr_def.value_type)
+
+# bool 类型：前端传 "是"/"否" → 后端转 True/False
+# int/float：字符串转数值类型
+
+# 链式 filter 实现 AND，__in 实现 OR
+queryset = queryset.filter(
+    attr_values__attr_def_id=attr_def_id,
+    attr_values__is_delete=NORMAL,
+    **{f'attr_values__{field_name}__in': filter_values}
+)
+```
+
+---
+
+### 18.4 前端：左侧属性筛选面板
+
+**布局变更：**
+
+```
+Header（sticky）
+Category Filter Bar（sticky）
+┌──────────────────────────────────────────┐
+│ filter-sidebar (192px) │   main (flex:1)  │
+│  [sticky, top:120px]   │  masonry grid    │
+└──────────────────────────────────────────┘
+```
+
+- 原 `.main` 的 `max-width / margin / padding` 移至新增 `.page-layout` 容器
+- `.filter-sidebar` 为 `position: sticky; top: 120px`，移动端（≤768px）强制隐藏
+- 侧边栏仅在 `filter-options` 返回非空数据时显示（`visible` class 控制）
+
+**JS 新增状态：**
+
+```javascript
+let activeAttrFilters = {}; // { attr_def_id: Set<string> }
+```
+
+**核心函数：**
+
+| 函数 | 职责 |
+|------|------|
+| `loadFilterOptions(catId)` | 请求 filter-options 接口，有数据则渲染侧边栏，否则隐藏 |
+| `renderSidebar(groups)` | 将属性分组渲染为 checkbox 列表 |
+| `onAttrFilterChange(e)` | checkbox 变更时更新 `activeAttrFilters`，触发 `loadProducts()` |
+| `clearAllFilters()` | 清空 `activeAttrFilters`，取消所有勾选，重载商品 |
+| `hideSidebar()` | 隐藏并清空侧边栏 |
+
+**setFilter 改动：** 切换品类时同步重置 `activeAttrFilters = {}`，再异步加载侧边栏与商品列表（两者并发，互不阻塞）。
+
+**loadProducts 改动：**
+
+```javascript
+for (const [attrId, valSet] of Object.entries(activeAttrFilters)) {
+  for (const val of valSet) {
+    params.append(`attr_${attrId}`, val);  // 同属性多值用 append
+  }
+}
+```
+
+---
+
+### 18.5 未完成计划（更新）
+
+| 优先级 | 功能 | 状态 |
+|--------|------|------|
+| 1 | 商品详情弹窗 Modal | ✅ 2026-05-03 完成 |
+| 2 | 商品关键词搜索 | ✅ 2026-05-03 完成 |
+| 3 | 按品类属性动态筛选 | ✅ 2026-05-04 完成 |
+| 4 | 商品图片上传与展示 | ⬜ 待开发 |
+| 5 | 图片存储优化（OSS） | ⬜ 生产环境再做 |

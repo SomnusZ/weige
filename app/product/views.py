@@ -15,8 +15,9 @@ from app.product_attr_value.serializers import (
     ProductAttrValueCreateSerializer,
     ProductAttrValueUpdateSerializer,
 )
+from app.category_attr_def.models import CategoryAttrDef
 from app.utils import success_response, error_response
-from app.dicts import DeleteStatus
+from app.dicts import DeleteStatus, ATTR_TYPE_FIELD_MAP
 
 
 def get_category_ids_with_descendants(category_id):
@@ -122,10 +123,21 @@ class ProductViewSet(ViewSet):
     def public_list(self, request):
         """
         前台公开商品列表（无需登录）
-        GET /api/products/public/?category_id=<id>&q=<keyword>
-          category_id — 按品类筛选（含子孙品类），可选
-          q           — 商品名称关键词搜索（模糊匹配），可选
-        返回商品基本信息 + 已填写的属性值列表，供前台展示页使用
+        GET /api/products/public/?category_id=<id>&q=<keyword>&attr_<id>=<val>&attr_<id>=<val>...
+
+        参数说明：
+          category_id  — 按品类筛选（含子孙品类），可选
+          q            — 商品名称关键词搜索（模糊匹配），可选
+          attr_<id>    — 按属性值筛选，<id> 为属性定义 ID，可重复传入（多值 OR）
+                         不同 attr_<id> 之间为 AND 关系
+                         例：?attr_1=红色&attr_1=蓝色&attr_2=XL
+                         → 颜色为红色或蓝色，且尺码为 XL
+
+        属性筛选实现说明：
+          - 遍历所有 attr_<id> 参数，每组值构成一个子查询（EXISTS 思路）
+          - 同属性多值：用 filter(...value_str__in=[...]) 一次过滤（OR 语义）
+          - 不同属性：链式 filter（AND 语义，每次 filter 进一步缩小结果集）
+          - bool 类型：前端传 "是"/"否"，后端转换为 True/False 再过滤
         """
         av_qs = ProductAttrValue.objects.filter(
             is_delete=DeleteStatus.NORMAL
@@ -152,8 +164,148 @@ class ProductViewSet(ViewSet):
         if keyword:
             queryset = queryset.filter(product_name__icontains=keyword)
 
+        # 属性值筛选：解析所有 attr_<id> 参数
+        attr_filters = {}
+        for key in request.query_params:
+            if key.startswith('attr_'):
+                try:
+                    attr_def_id = int(key[5:])  # 截取 'attr_' 后的数字部分
+                except ValueError:
+                    continue
+                values = request.query_params.getlist(key)  # 支持多值（OR）
+                if values:
+                    attr_filters[attr_def_id] = values
+
+        for attr_def_id, values in attr_filters.items():
+            # 查询该属性定义的 value_type，决定过滤字段
+            try:
+                attr_def = CategoryAttrDef.objects.get(
+                    id=attr_def_id,
+                    is_delete=DeleteStatus.NORMAL
+                )
+            except CategoryAttrDef.DoesNotExist:
+                continue
+
+            field_name = ATTR_TYPE_FIELD_MAP.get(attr_def.value_type)
+            if not field_name:
+                continue
+
+            # bool 类型：前端传 "是"/"否"，转换为 True/False
+            if attr_def.value_type == 'bool':
+                bool_values = []
+                for v in values:
+                    if v == '是':
+                        bool_values.append(True)
+                    elif v == '否':
+                        bool_values.append(False)
+                if not bool_values:
+                    continue
+                filter_values = bool_values
+            elif attr_def.value_type == 'int':
+                try:
+                    filter_values = [int(v) for v in values]
+                except ValueError:
+                    continue
+            elif attr_def.value_type == 'float':
+                try:
+                    filter_values = [float(v) for v in values]
+                except ValueError:
+                    continue
+            else:
+                filter_values = values  # str 类型直接用
+
+            # 链式 filter 实现 AND（每个属性独立子查询，多值 OR 用 __in）
+            queryset = queryset.filter(
+                attr_values__attr_def_id=attr_def_id,
+                attr_values__is_delete=DeleteStatus.NORMAL,
+                **{f'attr_values__{field_name}__in': filter_values}
+            )
+
         serializer = ProductPublicSerializer(queryset, many=True, context={'request': request})
         return success_response(data=serializer.data)
+
+    @action(methods=['GET'], detail=False, url_path='filter-options', permission_classes=[AllowAny])
+    def filter_options(self, request):
+        """
+        获取指定品类的属性筛选面板数据（公开接口）
+        GET /api/products/filter-options/?category_id=<id>
+
+        返回该品类下每个属性定义及其在商品中实际出现过的去重值列表，
+        供前台动态渲染多选筛选面板使用。
+
+        响应格式：
+        [
+          {
+            "attr_def_id": 1,
+            "attr_name": "颜色",
+            "value_type": "str",
+            "values": ["红色", "蓝色", "白色"]
+          },
+          ...
+        ]
+
+        设计说明：
+          - 只返回有商品数据的属性值（distinct），避免展示空选项
+          - bool 类型统一转为 "是"/"否" 字符串，方便前端统一渲染
+          - 若未传 category_id，返回空列表
+        """
+        category_id = request.query_params.get('category_id')
+        if not category_id:
+            return success_response(data=[])
+
+        try:
+            category_id = int(category_id)
+        except (ValueError, TypeError):
+            return success_response(data=[])
+
+        # 获取该品类下所有未删除的属性定义（按 id 排序，保持稳定顺序）
+        attr_defs = CategoryAttrDef.objects.filter(
+            category_id=category_id,
+            is_delete=DeleteStatus.NORMAL
+        ).order_by('id')
+
+        result = []
+        for attr_def in attr_defs:
+            field_name = ATTR_TYPE_FIELD_MAP.get(attr_def.value_type)
+            if not field_name:
+                continue
+
+            # 查询该属性在商品中实际存在的去重值（排除空值）
+            qs = (
+                ProductAttrValue.objects
+                .filter(
+                    attr_def=attr_def,
+                    is_delete=DeleteStatus.NORMAL,
+                    product__is_delete=DeleteStatus.NORMAL,
+                    **{f'{field_name}__isnull': False}
+                )
+                .values_list(field_name, flat=True)
+                .distinct()
+                .order_by(field_name)
+            )
+
+            if attr_def.value_type == 'bool':
+                # bool 转为可读字符串，去重后最多两个值
+                raw_values = list(qs)
+                values = []
+                if True in raw_values:
+                    values.append('是')
+                if False in raw_values:
+                    values.append('否')
+            else:
+                values = [str(v) for v in qs]
+
+            if not values:
+                continue  # 该属性无商品数据，跳过不展示
+
+            result.append({
+                'attr_def_id': attr_def.id,
+                'attr_name':   attr_def.attr_name,
+                'value_type':  attr_def.value_type,
+                'values':      values,
+            })
+
+        return success_response(data=result)
 
     @action(methods=['GET'], detail=False, url_path='dir')
     def dir_product(self, request):

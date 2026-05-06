@@ -106,10 +106,15 @@ body{background:var(--bg);color:var(--text);font-family:'PingFang SC','Microsoft
 .filter-chip.is-parent{font-weight:600;color:var(--text);}
 .filter-chip.is-parent.active{color:#fff;}
 
-/* ── Main ── */
-.main{
+/* ── Page layout（侧边栏 + 内容区）── */
+.page-layout{
   max-width:1600px;margin:0 auto;
   padding:20px 24px 40px;
+  display:flex;gap:20px;align-items:flex-start;
+}
+/* ── Main ── */
+.main{
+  flex:1;min-width:0;
 }
 
 /* ── Masonry grid（JS 手动分列，彻底避免 CSS columns balance 空列问题） ── */
@@ -124,10 +129,11 @@ body{background:var(--bg);color:var(--text);font-family:'PingFang SC','Microsoft
   gap:var(--col-gap);
 }
 @media(max-width:768px){
-  .main{padding:12px 12px 40px;}
+  .page-layout{padding:12px 12px 40px;gap:0;}
   .filter-wrap{padding:0 12px;}
   .header{padding:0 12px;}
   .header-subtitle{display:none;}
+  .filter-sidebar{display:none !important;}
 }
 
 /* ── Product card ── */
@@ -190,6 +196,62 @@ body{background:var(--bg);color:var(--text);font-family:'PingFang SC','Microsoft
   white-space:nowrap;max-width:120px;
   overflow:hidden;text-overflow:ellipsis;
 }
+
+/* ── Filter Sidebar ── */
+.filter-sidebar{
+  flex:0 0 192px;
+  position:sticky;top:120px;
+  background:var(--card);
+  border-radius:var(--radius);
+  box-shadow:var(--shadow);
+  padding:14px 0 8px;
+  display:none;
+  max-height:calc(100vh - 140px);
+  overflow-y:auto;
+}
+.filter-sidebar.visible{display:block;}
+.sidebar-hd{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 14px 10px;
+  border-bottom:1px solid var(--border);
+  margin-bottom:4px;
+}
+.sidebar-hd-title{font-size:13px;font-weight:700;color:var(--text);}
+.sidebar-clear-all{
+  font-size:11px;color:var(--text3);
+  border:none;background:none;padding:0;
+  font-family:inherit;cursor:pointer;
+  transition:color .15s;
+}
+.sidebar-clear-all:hover{color:var(--text);}
+.sidebar-clear-all.hidden{visibility:hidden;}
+.sidebar-group{
+  padding:10px 14px 6px;
+  border-bottom:1px solid var(--border);
+}
+.sidebar-group:last-child{border-bottom:none;}
+.sidebar-group-title{
+  font-size:11px;font-weight:600;color:var(--text3);
+  letter-spacing:.4px;margin-bottom:8px;
+}
+.sidebar-option{
+  display:flex;align-items:center;gap:7px;
+  margin-bottom:7px;cursor:pointer;user-select:none;
+}
+.sidebar-option input[type=checkbox]{
+  width:14px;height:14px;
+  accent-color:var(--accent);
+  cursor:pointer;flex-shrink:0;
+}
+.sidebar-option-label{
+  font-size:13px;color:var(--text2);
+  line-height:1.4;transition:color .15s;
+}
+.sidebar-option:hover .sidebar-option-label{color:var(--text);}
+.sidebar-option input:checked + .sidebar-option-label{
+  color:var(--accent);font-weight:600;
+}
+@media(max-width:1100px){.filter-sidebar{flex:0 0 164px;}}
 
 /* ── States ── */
 .state-box{
@@ -308,23 +370,33 @@ body{background:var(--bg);color:var(--text);font-family:'PingFang SC','Microsoft
   </div>
 </div>
 
-<!-- Main content -->
-<main class="main">
-  <div class="skeleton-grid" id="skeleton"></div>
-  <div class="products-grid" id="products-grid" style="display:none"></div>
-  <div class="state-box" id="state-box" style="display:none">
-    <div class="s-icon">🔍</div>
-    <div class="s-text">该品类暂无商品</div>
-  </div>
-</main>
+<!-- Page layout: sidebar + content -->
+<div class="page-layout">
+
+  <!-- 左侧属性筛选面板（选中叶子品类后动态渲染） -->
+  <aside class="filter-sidebar" id="filter-sidebar"></aside>
+
+  <!-- Main content -->
+  <main class="main">
+    <div class="skeleton-grid" id="skeleton"></div>
+    <div class="products-grid" id="products-grid" style="display:none"></div>
+    <div class="state-box" id="state-box" style="display:none">
+      <div class="s-icon">🔍</div>
+      <div class="s-text">该品类暂无商品</div>
+    </div>
+  </main>
+
+</div>
 
 <script>
-const API_CATS  = '/api/categories/public/';
-const API_PRODS = '/api/products/public/';
+const API_CATS           = '/api/categories/public/';
+const API_PRODS          = '/api/products/public/';
+const API_FILTER_OPTIONS = '/api/products/filter-options/';
 
-let activeCatId    = '';
-let activeKeyword  = '';
-let currentProducts = [];
+let activeCatId      = '';
+let activeKeyword    = '';
+let activeAttrFilters = {};   // { attr_def_id(Number): Set<string> }
+let currentProducts  = [];
 
 // ── 骨架屏 ──
 (function buildSkeleton(){
@@ -387,10 +459,94 @@ function renderFilterBar(cats){
 
 function setFilter(catId){
   activeCatId = catId;
+  activeAttrFilters = {};   // 切换品类时清空属性筛选
   document.querySelectorAll('.filter-chip').forEach(b => {
     b.classList.toggle('active', b.dataset.id === catId);
   });
+  loadFilterOptions(catId); // 异步加载侧边栏（与 loadProducts 并发）
   loadProducts();
+}
+
+// ── 侧边栏：加载属性选项 ──
+async function loadFilterOptions(catId){
+  if(!catId){ hideSidebar(); return; }
+  try{
+    const res  = await fetch(`${API_FILTER_OPTIONS}?category_id=${catId}`);
+    const json = await res.json();
+    if(json.success && json.data.length > 0){
+      renderSidebar(json.data);
+    } else {
+      hideSidebar();
+    }
+  }catch(e){ hideSidebar(); }
+}
+
+// ── 侧边栏：渲染 ──
+function renderSidebar(groups){
+  const sidebar  = document.getElementById('filter-sidebar');
+  const hasSel   = Object.keys(activeAttrFilters).length > 0;
+
+  let html = `
+    <div class="sidebar-hd">
+      <span class="sidebar-hd-title">筛选</span>
+      <button class="sidebar-clear-all${hasSel ? '' : ' hidden'}" onclick="clearAllFilters()">清空</button>
+    </div>`;
+
+  groups.forEach(g => {
+    html += `<div class="sidebar-group">
+      <div class="sidebar-group-title">${escHtml(g.attr_name)}</div>`;
+    g.values.forEach(v => {
+      const checked = activeAttrFilters[g.attr_def_id]?.has(v) ? 'checked' : '';
+      html += `
+        <label class="sidebar-option">
+          <input type="checkbox" ${checked}
+                 data-attr="${g.attr_def_id}"
+                 data-val="${escHtml(v)}">
+          <span class="sidebar-option-label">${escHtml(v)}</span>
+        </label>`;
+    });
+    html += `</div>`;
+  });
+
+  sidebar.innerHTML = html;
+  sidebar.querySelectorAll('input[type=checkbox]').forEach(cb => {
+    cb.addEventListener('change', onAttrFilterChange);
+  });
+  sidebar.classList.add('visible');
+}
+
+// ── 侧边栏：单个复选框变更 ──
+function onAttrFilterChange(e){
+  const attrId = Number(e.target.dataset.attr);
+  const val    = e.target.dataset.val;
+  if(!activeAttrFilters[attrId]) activeAttrFilters[attrId] = new Set();
+  if(e.target.checked){
+    activeAttrFilters[attrId].add(val);
+  } else {
+    activeAttrFilters[attrId].delete(val);
+    if(activeAttrFilters[attrId].size === 0) delete activeAttrFilters[attrId];
+  }
+  // 同步"清空"按钮显隐
+  const clearBtn = document.querySelector('.sidebar-clear-all');
+  if(clearBtn) clearBtn.classList.toggle('hidden', Object.keys(activeAttrFilters).length === 0);
+  loadProducts();
+}
+
+// ── 侧边栏：清空全部筛选 ──
+function clearAllFilters(){
+  activeAttrFilters = {};
+  document.querySelectorAll('#filter-sidebar input[type=checkbox]')
+          .forEach(cb => { cb.checked = false; });
+  const clearBtn = document.querySelector('.sidebar-clear-all');
+  if(clearBtn) clearBtn.classList.add('hidden');
+  loadProducts();
+}
+
+// ── 侧边栏：隐藏 ──
+function hideSidebar(){
+  const sidebar = document.getElementById('filter-sidebar');
+  sidebar.classList.remove('visible');
+  sidebar.innerHTML = '';
 }
 
 function doSearch(){
@@ -451,6 +607,12 @@ async function loadProducts(){
   const params = new URLSearchParams();
   if(activeCatId)   params.set('category_id', activeCatId);
   if(activeKeyword) params.set('q', activeKeyword);
+  // 属性筛选：同属性多值用 append（生成 attr_1=红色&attr_1=蓝色）
+  for(const [attrId, valSet] of Object.entries(activeAttrFilters)){
+    for(const val of valSet){
+      params.append(`attr_${attrId}`, val);
+    }
+  }
   const url = `${API_PRODS}${params.toString() ? '?' + params.toString() : ''}`;
 
   try{
