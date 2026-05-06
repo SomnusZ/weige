@@ -886,7 +886,7 @@ function prodRenderModule(list, catFilter) {
     const stock = p.product_stock;
     const sc = stock === 0 ? 'stock-zero' : stock < 10 ? 'stock-low' : 'stock-ok';
     const sl = stock === 0 ? '缺货' : `库存 ${stock}`;
-    const imgHtml = p.product_image ? `<img src="${p.product_image}" alt="" onerror="this.style.display='none'">` : '📦';
+    const imgHtml = p.product_image_url ? `<img src="${p.product_image_url}" alt="" onerror="this.style.display='none'">` : '📦';
     return `<div class="prod-card">
       <div class="pc-thumb">${imgHtml}</div>
       <div class="pc-actions">

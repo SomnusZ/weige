@@ -74,12 +74,21 @@ class ProductListSerializer(serializers.ModelSerializer):
     """
     商品列表序列化器（用于 GET 响应）
     只返回前端需要的字段
+    product_image_url 返回绝对 URL，保持与 ProductPublicSerializer 一致的设计
     """
+    product_image_url = serializers.SerializerMethodField()
+
+    def get_product_image_url(self, obj):
+        if not obj.product_image:
+            return None
+        request = self.context.get('request')
+        url = obj.product_image.url          # → /media/products/xxx.jpg
+        return request.build_absolute_uri(url) if request else url
 
     class Meta:
         model = Product
         fields = ['id', 'product_name', 'category_id', 'product_price',
-                  'product_image', 'product_stock', 'create_time']
+                  'product_image_url', 'product_stock', 'create_time']
 
 
 class ProductPublicSerializer(serializers.ModelSerializer):

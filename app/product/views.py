@@ -322,7 +322,7 @@ class ProductViewSet(ViewSet):
             category_ids = get_category_ids_with_descendants(int(category_id))
             queryset = queryset.filter(category_id__in=category_ids)
 
-        serializer = ProductListSerializer(queryset, many=True)
+        serializer = ProductListSerializer(queryset, many=True, context={'request': request})
         return success_response(data=serializer.data)
 
     @action(methods=['POST'], detail=False, url_path='create')

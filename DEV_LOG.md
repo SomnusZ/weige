@@ -26,6 +26,7 @@
 16. [2026-05-01 前台商品展示页](#16-2026-05-01-前台商品展示页)（含 16.9 瀑布流 CSS columns → JS flex masonry 迁移）
 17. [2026-05-03 商品详情弹窗 + 关键词搜索](#17-2026-05-03-商品详情弹窗--关键词搜索)
 18. [2026-05-04 按属性动态筛选](#18-2026-05-04-按属性动态筛选)
+19. [2026-05-04 商品图片上传与显示修复](#19-2026-05-04-商品图片上传与显示修复)
 
 ---
 
@@ -2573,5 +2574,77 @@ for (const [attrId, valSet] of Object.entries(activeAttrFilters)) {
 | 1 | 商品详情弹窗 Modal | ✅ 2026-05-03 完成 |
 | 2 | 商品关键词搜索 | ✅ 2026-05-03 完成 |
 | 3 | 按品类属性动态筛选 | ✅ 2026-05-04 完成 |
-| 4 | 商品图片上传与展示 | ⬜ 待开发 |
+| 4 | 商品图片上传与展示 | ✅ 2026-05-04 完成 |
+| 5 | 图片存储优化（OSS） | ⬜ 生产环境再做 |
+
+---
+
+## 19. 2026-05-04 商品图片上传与显示修复
+
+### 19.1 问题排查
+
+检查图片上传链路各环节：
+
+| 环节 | 状态 | 说明 |
+|------|------|------|
+| `ImageField(upload_to='products/')` | ✅ | 模型字段已配置 |
+| `MEDIA_URL / MEDIA_ROOT` | ✅ | settings.py 已配置 `/media/` |
+| 开发环境媒体路由 | ✅ | urls.py 已加 `static(MEDIA_URL, ...)` |
+| Pillow | ✅ | 已安装 v12.0.0 |
+| Create/Update 序列化器 | ✅ | 均含 `product_image` 字段，可接收文件 |
+| 前台公开序列化器 | ✅ | 已返回绝对 URL |
+| `media/` 目录 | ⚠️ | 不存在，但 Django 首次上传时自动创建 |
+| **后台列表序列化器** | ❌ | **返回相对路径，导致 dashboard 图片显示 404** |
+
+**根本原因：** `ProductListSerializer` 直接返回 `product_image` 字段的原始值（如 `products/xxx.jpg`），缺少 `/media/` 前缀，dashboard 前端拼接 `<img src="products/xxx.jpg">` 路径错误。
+
+---
+
+### 19.2 修复方案（方案 A：序列化器统一返回绝对 URL）
+
+**修改 `ProductListSerializer`（`app/product/serializers.py`）：**
+
+```python
+class ProductListSerializer(serializers.ModelSerializer):
+    product_image_url = serializers.SerializerMethodField()
+
+    def get_product_image_url(self, obj):
+        if not obj.product_image:
+            return None
+        request = self.context.get('request')
+        url = obj.product_image.url          # → /media/products/xxx.jpg
+        return request.build_absolute_uri(url) if request else url
+
+    class Meta:
+        model = Product
+        fields = ['id', 'product_name', 'category_id', 'product_price',
+                  'product_image_url', 'product_stock', 'create_time']
+```
+
+**修改 `dir_product` view（`app/product/views.py`）：**
+
+```python
+# 传入 request，使序列化器可以构建绝对 URL
+serializer = ProductListSerializer(queryset, many=True, context={'request': request})
+```
+
+**修改 `dashboard.html`：**
+
+```javascript
+// 旧：p.product_image（相对路径，404）
+// 新：p.product_image_url（绝对 URL）
+const imgHtml = p.product_image_url
+  ? `<img src="${p.product_image_url}" alt="" onerror="this.style.display='none'">`
+  : '📦';
+```
+
+**设计一致性：** 与 `ProductPublicSerializer.get_product_image_url` 保持同一实现风格，换生产域名也无需改前端。
+
+---
+
+### 19.3 未完成计划（更新）
+
+| 优先级 | 功能 | 状态 |
+|--------|------|------|
+| 1~4 | 详情弹窗、关键词搜索、属性筛选、图片上传 | ✅ 全部完成 |
 | 5 | 图片存储优化（OSS） | ⬜ 生产环境再做 |
