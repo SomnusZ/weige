@@ -1,115 +1,109 @@
 from rest_framework import serializers
-from .models import Product
+from .models import Product, ProductImage
 from app.category.models import Category
 from app.dicts import DeleteStatus
 
 
-class ProductValidationMixin:
-    """
-    商品字段校验 Mixin
-    提取 Create 和 Update 序列化器的公共校验逻辑，避免重复代码
-    """
+class ProductImageSerializer(serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField()
 
+    def get_image_url(self, obj):
+        request = self.context.get('request')
+        url = obj.image.url
+        return request.build_absolute_uri(url) if request else url
+
+    class Meta:
+        model = ProductImage
+        fields = ['id', 'image_url', 'is_primary', 'sort_order']
+
+
+class ProductValidationMixin:
     def validate_product_name(self, value):
-        """商品名称：去除首尾空格后不能为空"""
         value = value.strip()
         if not value:
             raise serializers.ValidationError('商品名称不能为空')
         return value
 
     def validate_product_price(self, value):
-        """商品价格：不能为负数"""
         if value < 0:
             raise serializers.ValidationError('商品价格不能为负数')
         return value
 
     def validate_product_stock(self, value):
-        """库存数量：不能为负数"""
         if value < 0:
             raise serializers.ValidationError('库存数量不能为负数')
         return value
 
 
 class ProductCreateSerializer(ProductValidationMixin, serializers.ModelSerializer):
-    """
-    商品创建序列化器（用于 POST 请求）
-    category 创建后不可修改，与 update 序列化器分开
-    """
-
     class Meta:
         model = Product
-        fields = ['product_name', 'category', 'product_price', 'product_image', 'product_stock']
+        fields = ['product_name', 'category', 'product_price', 'product_stock']
 
     def validate_category(self, value):
-        """
-        所属品类校验：
-        1. 品类必须存在且未被逻辑删除
-        2. 品类必须是叶子节点（无子品类）
-           背景：商品是具体的实体，应挂在最小粒度的品类（叶子节点）上。
-                叶子节点同时持有该品类的属性定义模板，商品在此填写
-                对应的属性值，形成完整的 EAV 数据链路。
-                若允许商品挂在非叶子节点，则无法对应到具体的属性定义，
-                商品的动态属性将无从录入。
-        """
         if value.is_delete == DeleteStatus.DELETED:
             raise serializers.ValidationError('所属品类不存在或已被删除')
-        # 检查是否为叶子节点：若存在未删除的子品类，则为非叶子节点，拒绝操作
         if Category.objects.filter(parent=value, is_delete=DeleteStatus.NORMAL).exists():
             raise serializers.ValidationError('只能选择末级品类（该品类下还有子品类）')
         return value
 
 
 class ProductUpdateSerializer(ProductValidationMixin, serializers.ModelSerializer):
-    """
-    商品修改序列化器（用于 PATCH 请求）
-    不允许修改 category，防止品类变更导致动态属性数据混乱
-    """
-
     class Meta:
         model = Product
-        fields = ['product_name', 'product_price', 'product_image', 'product_stock']
+        fields = ['product_name', 'product_price', 'product_stock']
+
+
+def _get_primary_image_url(obj, request):
+    images = getattr(obj, 'prefetched_images', [])
+    primary = next((img for img in images if img.is_primary and not img.is_delete), None)
+    if primary is None and images:
+        primary = images[0]
+    if not primary:
+        return None
+    url = primary.image.url
+    return request.build_absolute_uri(url) if request else url
 
 
 class ProductListSerializer(serializers.ModelSerializer):
-    """
-    商品列表序列化器（用于 GET 响应）
-    只返回前端需要的字段
-    product_image_url 返回绝对 URL，保持与 ProductPublicSerializer 一致的设计
-    """
-    product_image_url = serializers.SerializerMethodField()
+    primary_image_url = serializers.SerializerMethodField()
 
-    def get_product_image_url(self, obj):
-        if not obj.product_image:
-            return None
-        request = self.context.get('request')
-        url = obj.product_image.url          # → /media/products/xxx.jpg
-        return request.build_absolute_uri(url) if request else url
+    def get_primary_image_url(self, obj):
+        return _get_primary_image_url(obj, self.context.get('request'))
 
     class Meta:
         model = Product
         fields = ['id', 'product_name', 'category_id', 'product_price',
-                  'product_image_url', 'product_stock', 'create_time']
+                  'primary_image_url', 'product_stock', 'create_time']
 
 
 class ProductPublicSerializer(serializers.ModelSerializer):
-    """
-    前台商品公开序列化器
-    用于前台商品列表页（无需登录），附带品类名称和属性值列表
-    """
     category_name     = serializers.CharField(source='category.category_name', read_only=True)
-    product_image_url = serializers.SerializerMethodField()
+    primary_image_url = serializers.SerializerMethodField()
+    images            = serializers.SerializerMethodField()
     attrs             = serializers.SerializerMethodField()
 
-    def get_product_image_url(self, obj):
-        if not obj.product_image:
-            return None
+    def get_primary_image_url(self, obj):
+        return _get_primary_image_url(obj, self.context.get('request'))
+
+    def get_images(self, obj):
         request = self.context.get('request')
-        url = obj.product_image.url
-        return request.build_absolute_uri(url) if request else url
+        result = []
+        for img in getattr(obj, 'prefetched_images', []):
+            if img.is_delete:
+                continue
+            url = img.image.url
+            result.append({
+                'id': img.id,
+                'url': request.build_absolute_uri(url) if request else url,
+                'is_primary': img.is_primary,
+                'sort_order': img.sort_order,
+            })
+        return result
 
     def get_attrs(self, obj):
         result = []
-        for av in obj.prefetched_attr_values:   # 由 view 层 prefetch_related 注入
+        for av in obj.prefetched_attr_values:
             vtype = av.attr_def.value_type
             if vtype == 'str':
                 val = av.value_str
@@ -128,4 +122,4 @@ class ProductPublicSerializer(serializers.ModelSerializer):
     class Meta:
         model  = Product
         fields = ['id', 'product_name', 'category_id', 'category_name',
-                  'product_price', 'product_stock', 'product_image_url', 'attrs']
+                  'product_price', 'product_stock', 'primary_image_url', 'images', 'attrs']

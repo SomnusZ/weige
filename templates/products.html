@@ -307,16 +307,52 @@ body{background:var(--bg);color:var(--text);font-family:'PingFang SC','Microsoft
 }
 .modal-close:hover{background:rgba(0,0,0,.55);}
 
-/* 左侧图片 */
+/* 左侧图片 / 轮播 */
 .modal-img-panel{
-  flex:0 0 50%;background:#f0f0f2;
-  display:flex;align-items:center;justify-content:center;
+  flex:0 0 50%;background:#111;
+  display:flex;align-items:stretch;justify-content:stretch;
   min-height:420px;overflow:hidden;
 }
-.modal-img-panel img{
-  width:100%;height:100%;object-fit:cover;display:block;
+.modal-img-placeholder{font-size:72px;color:#d0d0d5;margin:auto;}
+
+/* 轮播容器 */
+.carousel-wrap{width:100%;display:flex;flex-direction:column;}
+.carousel-main{
+  flex:1;position:relative;overflow:hidden;
+  display:flex;align-items:center;justify-content:center;
+  background:#111;
 }
-.modal-img-placeholder{font-size:72px;color:#d0d0d5;}
+.carousel-main img{width:100%;height:100%;object-fit:cover;display:block;}
+.carousel-counter{
+  position:absolute;top:10px;left:12px;
+  background:rgba(0,0,0,.45);color:#fff;
+  font-size:11px;padding:3px 9px;border-radius:10px;
+  backdrop-filter:blur(4px);pointer-events:none;
+}
+.carousel-arrow{
+  position:absolute;top:50%;transform:translateY(-50%);
+  background:rgba(0,0,0,.35);color:#fff;border:none;
+  width:32px;height:48px;border-radius:5px;font-size:22px;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  transition:background .15s;backdrop-filter:blur(3px);z-index:5;line-height:1;
+  padding:0;
+}
+.carousel-arrow:hover{background:rgba(0,0,0,.65);}
+.carousel-prev{left:8px;}
+.carousel-next{right:8px;}
+.carousel-dots{
+  position:absolute;bottom:12px;left:50%;transform:translateX(-50%);
+  display:flex;gap:6px;align-items:center;
+}
+.carousel-dot{
+  width:6px;height:6px;border-radius:50%;
+  background:rgba(255,255,255,.5);
+  cursor:pointer;transition:all .2s;flex-shrink:0;
+}
+.carousel-dot.active{
+  width:18px;border-radius:3px;
+  background:#fff;
+}
 
 /* 右侧信息 */
 .modal-info-panel{
@@ -638,8 +674,8 @@ async function loadProducts(){
 
 // ── 渲染单张卡片 ──
 function renderCard(p){
-  const imgHtml = p.product_image_url
-    ? `<img data-src="${p.product_image_url}" alt="${escHtml(p.product_name)}">`
+  const imgHtml = p.primary_image_url
+    ? `<img data-src="${p.primary_image_url}" alt="${escHtml(p.product_name)}">`
     : `<div class="card-img-placeholder">🏷️</div>`;
 
   const attrHtml = (p.attrs || []).slice(0, 4).map(a =>
@@ -698,15 +734,51 @@ function escHtml(s){
     .replace(/"/g,'&quot;');
 }
 
-// ── Modal ──
+// ── 轮播 ──────────────────────────────────────────────────────
+let _carouselImages = [];
+let _carouselIdx    = 0;
+
+function _carouselRender(idx) {
+  _carouselIdx = idx;
+  const imgs  = _carouselImages;
+  const total = imgs.length;
+  const panel = document.getElementById('modal-img');
+  if (!total) {
+    panel.innerHTML = '<div class="modal-img-placeholder">🏷️</div>';
+    return;
+  }
+  const cur     = imgs[idx];
+  const hasMult = total > 1;
+  panel.innerHTML = `
+    <div class="carousel-wrap">
+      <div class="carousel-main">
+        <img src="${escHtml(cur.url)}" alt="">
+        ${hasMult ? `<div class="carousel-counter">${idx + 1} / ${total}</div>` : ''}
+        ${hasMult ? `<button class="carousel-arrow carousel-prev" onclick="_carouselPrev()">&#8249;</button>` : ''}
+        ${hasMult ? `<button class="carousel-arrow carousel-next" onclick="_carouselNext()">&#8250;</button>` : ''}
+        ${hasMult ? `
+        <div class="carousel-dots">
+          ${imgs.map((_, i) => `<div class="carousel-dot${i === idx ? ' active' : ''}" onclick="_carouselRender(${i})"></div>`).join('')}
+        </div>` : ''}
+      </div>
+    </div>`;
+}
+function _carouselPrev() {
+  const t = _carouselImages.length;
+  _carouselRender((_carouselIdx - 1 + t) % t);
+}
+function _carouselNext() {
+  _carouselRender((_carouselIdx + 1) % _carouselImages.length);
+}
+
+// ── Modal ──────────────────────────────────────────────────────
 function openModal(productId){
   const p = currentProducts.find(x => x.id === productId);
   if(!p) return;
 
-  // 左侧图片
-  document.getElementById('modal-img').innerHTML = p.product_image_url
-    ? `<img src="${escHtml(p.product_image_url)}" alt="${escHtml(p.product_name)}">`
-    : `<div class="modal-img-placeholder">🏷️</div>`;
+  // 左侧轮播
+  _carouselImages = (p.images || []).slice().sort((a, b) => a.sort_order - b.sort_order);
+  _carouselRender(0);
 
   // 右侧信息
   const attrRows = (p.attrs || []).map(a => `
@@ -742,9 +814,15 @@ function closeModal(){
 document.getElementById('modal-overlay').addEventListener('click', function(e){
   if(e.target === this) closeModal();
 });
+// 键盘导航
+document.addEventListener('keydown', function(e){
+  if(!document.getElementById('modal-overlay').classList.contains('open')) return;
+  if(e.key === 'ArrowLeft')  _carouselPrev();
+  if(e.key === 'ArrowRight') _carouselNext();
+  if(e.key === 'Escape')     closeModal();
+});
 
 // ESC 关闭
-document.addEventListener('keydown', e => { if(e.key === 'Escape') closeModal(); });
 </script>
 
 <!-- Modal -->
